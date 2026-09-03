@@ -12,8 +12,8 @@ import {
   SettingsOutlined, NavigateNext, BusinessOutlined,
   AddOutlined, EditOutlined, DeleteOutline, SaveOutlined,
   AnalyticsOutlined, MenuBookOutlined, AccountTreeOutlined,
-  ListAltOutlined, AdminPanelSettingsOutlined, CheckOutlined, CloseOutlined, 
-  DashboardOutlined,
+  ListAltOutlined, AdminPanelSettingsOutlined, CheckOutlined, CloseOutlined,
+  DashboardOutlined, PercentOutlined,
 
 } from '@mui/icons-material';
 import AccessTimeOutlined from '@mui/icons-material/AccessTimeOutlined';
@@ -2099,6 +2099,15 @@ const CRM = () => {
   const [confirmSeuilOpen, setConfirmSeuilOpen] = useState(false);
   const [confirmSeuilLoading, setConfirmSeuilLoading] = useState(false);
   const [pendingSeuilValue, setPendingSeuilValue] = useState(null);
+
+  // --- Taux TVA (paramétrage) ---
+  const [tauxTvaList, setTauxTvaList] = useState([]);
+  const [tauxTvaLoading, setTauxTvaLoading] = useState(false);
+  const [newTauxDeductible, setNewTauxDeductible] = useState(true);
+  const [newTauxValue, setNewTauxValue] = useState('');
+  const [editTauxId, setEditTauxId] = useState(null);
+  const [editTauxDeductible, setEditTauxDeductible] = useState(true);
+  const [editTauxValue, setEditTauxValue] = useState('');
   const [crmData, setCrmData] = useState(null);
 
   const formikNewJournal = useFormik({
@@ -2332,6 +2341,74 @@ const CRM = () => {
     }
   };
 
+  // --- Taux TVA (paramétrage) ---
+  const fetchTauxTva = async () => {
+    if (!fileId || fileId === '0' || !compteId) return;
+    setTauxTvaLoading(true);
+    try {
+      const res = await axiosPrivate.get(`/paramTauxTva/${compteId}/${fileId}`);
+      if (res.data?.state) setTauxTvaList(res.data.data || []);
+    } catch (e) {
+      console.error('Erreur chargement taux TVA', e);
+    } finally {
+      setTauxTvaLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 6) fetchTauxTva();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, fileId]);
+
+  const handleAddTaux = async () => {
+    const v = Number(String(newTauxValue).replace(',', '.'));
+    if (isNaN(v) || v < 0) { toast.error('Taux invalide'); return; }
+    try {
+      await axiosPrivate.post('/paramTauxTva', {
+        id_compte: compteId, id_dossier: fileId, deductible: newTauxDeductible, taux: v,
+      });
+      setNewTauxValue('');
+      await fetchTauxTva();
+      toast.success('Taux ajouté');
+    } catch (e) {
+      toast.error('Erreur lors de l\'ajout');
+    }
+  };
+
+  const handleDeleteTaux = async (id) => {
+    try {
+      await axiosPrivate.delete(`/paramTauxTva/${id}`);
+      await fetchTauxTva();
+      toast.success('Taux supprimé');
+    } catch (e) {
+      toast.error('Erreur lors de la suppression');
+    }
+  };
+
+  const startEditTaux = (row) => {
+    setEditTauxId(row.id);
+    setEditTauxDeductible(row.deductible);
+    setEditTauxValue(String(row.taux));
+  };
+
+  const cancelEditTaux = () => {
+    setEditTauxId(null);
+    setEditTauxValue('');
+  };
+
+  const saveEditTaux = async () => {
+    const v = Number(String(editTauxValue).replace(',', '.'));
+    if (isNaN(v) || v < 0) { toast.error('Taux invalide'); return; }
+    try {
+      await axiosPrivate.put(`/paramTauxTva/${editTauxId}`, { deductible: editTauxDeductible, taux: v });
+      cancelEditTaux();
+      await fetchTauxTva();
+      toast.success('Taux modifié');
+    } catch (e) {
+      toast.error('Erreur lors de la modification');
+    }
+  };
+
   // Style Header Tableau (Pro & Minimaliste)
   const headerStyle = {
     fontWeight: 800,
@@ -2483,6 +2560,7 @@ const CRM = () => {
               { value: 3, label: 'Analytique', icon: <AccountTreeOutlined /> },
               { value: 5, label: 'Comptes TVA', icon: <AnalyticsOutlined /> },
               { value: 0, label: 'Seuils', icon: <SettingsOutlined /> },
+              { value: 6, label: 'Taux TVA', icon: <PercentOutlined /> },
             ].map((s) => {
               const active = activeTab === s.value;
               return (
@@ -2585,6 +2663,138 @@ const CRM = () => {
                   </Paper>
                 </Grid>
               </Grid>
+            </Box>
+          )}
+
+          {/* TAUX TVA */}
+          {activeTab === 6 && (
+            <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+              <Paper elevation={0} sx={{ ...panelSx, p: 3 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <PercentOutlined sx={{ color: T.accent }} /> Taux de TVA
+                </Typography>
+
+                {/* Formulaire d'ajout */}
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'flex-end' }} sx={{ mb: 3 }}>
+                  <Box sx={{ minWidth: 200 }}>
+                    <FieldLabel>Type de TVA</FieldLabel>
+                    <Select
+                      value={newTauxDeductible ? 'deductible' : 'collectee'}
+                      onChange={(e) => setNewTauxDeductible(e.target.value === 'deductible')}
+                      size="small"
+                      fullWidth
+                    >
+                      <MenuItem value="deductible">Déductible</MenuItem>
+                      <MenuItem value="collectee">Collectée</MenuItem>
+                    </Select>
+                  </Box>
+                  <Box sx={{ minWidth: 160 }}>
+                    <FieldLabel>Taux (%)</FieldLabel>
+                    <TextField
+                      value={newTauxValue}
+                      onChange={(e) => setNewTauxValue(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleAddTaux(); }}
+                      type="number"
+                      size="small"
+                      placeholder="20"
+                      fullWidth
+                    />
+                  </Box>
+                  <Button
+                    variant="contained"
+                    disableElevation
+                    startIcon={<AddOutlined />}
+                    sx={{ ...primaryBtnSx, height: '40px' }}
+                    onClick={handleAddTaux}
+                  >
+                    Ajouter
+                  </Button>
+                </Stack>
+
+                {/* Liste des taux paramétrés */}
+                <TableContainer sx={{ border: `1px solid ${T.line}`, borderRadius: '12px' }}>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow sx={{ '& th': { bgcolor: '#F8FAFC', color: '#64748B', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.4px' } }}>
+                        <TableCell>Type</TableCell>
+                        <TableCell align="right">Taux</TableCell>
+                        <TableCell align="right" sx={{ width: 90 }}>Action</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {tauxTvaList.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={3} sx={{ textAlign: 'center', color: T.faint, py: 3 }}>
+                            {tauxTvaLoading ? 'Chargement…' : 'Aucun taux paramétré'}
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        tauxTvaList.map((row) => (
+                          editTauxId === row.id ? (
+                            <TableRow key={row.id}>
+                              <TableCell>
+                                <Select
+                                  value={editTauxDeductible ? 'deductible' : 'collectee'}
+                                  onChange={(e) => setEditTauxDeductible(e.target.value === 'deductible')}
+                                  size="small"
+                                  sx={{ minWidth: 180 }}
+                                >
+                                  <MenuItem value="deductible">Déductible (achats)</MenuItem>
+                                  <MenuItem value="collectee">Collectée (ventes)</MenuItem>
+                                </Select>
+                              </TableCell>
+                              <TableCell align="right">
+                                <TextField
+                                  value={editTauxValue}
+                                  onChange={(e) => setEditTauxValue(e.target.value)}
+                                  onKeyDown={(e) => { if (e.key === 'Enter') saveEditTaux(); if (e.key === 'Escape') cancelEditTaux(); }}
+                                  type="number"
+                                  size="small"
+                                  sx={{ width: 110 }}
+                                  autoFocus
+                                />
+                              </TableCell>
+                              <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                                <IconButton size="small" onClick={saveEditTaux} sx={{ color: T.accent }}>
+                                  <CheckOutlined fontSize="small" />
+                                </IconButton>
+                                <IconButton size="small" onClick={cancelEditTaux} sx={{ color: T.faint }}>
+                                  <CloseOutlined fontSize="small" />
+                                </IconButton>
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            <TableRow key={row.id} hover>
+                              <TableCell>
+                                <Chip
+                                  label={row.deductible ? 'Déductible' : 'Collectée'}
+                                  size="small"
+                                  sx={{
+                                    bgcolor: row.deductible ? T.accW : '#FDF2E9',
+                                    color: row.deductible ? T.accent : '#B5791A',
+                                    fontWeight: 700, fontSize: '11px',
+                                  }}
+                                />
+                              </TableCell>
+                              <TableCell align="right" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                                {Number(row.taux).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} %
+                              </TableCell>
+                              <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                                <IconButton size="small" onClick={() => startEditTaux(row)} sx={{ color: T.muted }}>
+                                  <EditOutlined fontSize="small" />
+                                </IconButton>
+                                <IconButton size="small" onClick={() => handleDeleteTaux(row.id)} sx={{ color: T.neg }}>
+                                  <DeleteOutline fontSize="small" />
+                                </IconButton>
+                              </TableCell>
+                            </TableRow>
+                          )
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Paper>
             </Box>
           )}
 

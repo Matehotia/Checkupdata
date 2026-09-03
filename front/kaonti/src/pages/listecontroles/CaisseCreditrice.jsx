@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  Box, Typography, Stack, Chip, CircularProgress, Alert,
+  Box, Typography, Stack, Chip, CircularProgress, Button,
   Table, TableHead, TableBody, TableRow, TableCell, TableContainer,
 } from '@mui/material';
-import { CheckCircleOutline, WarningAmberOutlined } from '@mui/icons-material';
+import { CheckCircleOutline, WarningAmberOutlined, RestartAltOutlined } from '@mui/icons-material';
+import toast from 'react-hot-toast';
 import useAxiosPrivate from '../../hooks/useAxiosPrivate';
 import useAuth from '../../hooks/useAuth';
 import { useExercicePeriode } from '../../context/ExercicePeriodeContext';
@@ -54,26 +55,49 @@ const CaisseCreditrice = ({ id_exercice, id_periode }) => {
   }), [auth]);
 
   const [loading, setLoading] = useState(false);
+  const [revising, setRevising] = useState(false);
   const [data, setData] = useState(null);
 
-  const fetchData = useCallback(async () => {
+  // Lecture des anomalies enregistrées (pas de recalcul)
+  const fetchStored = useCallback(async () => {
     if (!effectiveExerciceId) return;
     setLoading(true);
     try {
-      let url = `/administration/caisseCreditrice/${ids.id_compte}/${ids.id_dossier}/${effectiveExerciceId}`;
-      if (selectedPeriodeDates?.date_debut && selectedPeriodeDates?.date_fin) {
-        url += `?date_debut=${selectedPeriodeDates.date_debut}&date_fin=${selectedPeriodeDates.date_fin}`;
-      }
+      let url = `/administration/caisseCreditrice/stored/${ids.id_compte}/${ids.id_dossier}/${effectiveExerciceId}`;
+      if (effectivePeriodeId) url += `?id_periode=${effectivePeriodeId}`;
       const res = await axiosPrivate.get(url);
       if (res.data?.state) setData(res.data.data);
     } catch (e) {
-      console.error('Erreur caisse créditrice:', e);
+      console.error('Erreur lecture caisse créditrice:', e);
     } finally {
       setLoading(false);
     }
-  }, [axiosPrivate, ids, effectiveExerciceId, effectivePeriodeId, selectedPeriodeDates]);
+  }, [axiosPrivate, ids, effectiveExerciceId, effectivePeriodeId]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  // Réviser = recalcule + enregistre + rafraîchit
+  const handleReviser = async () => {
+    if (!effectiveExerciceId) return;
+    setRevising(true);
+    try {
+      const qs = [];
+      if (selectedPeriodeDates?.date_debut && selectedPeriodeDates?.date_fin) {
+        qs.push(`date_debut=${selectedPeriodeDates.date_debut}`, `date_fin=${selectedPeriodeDates.date_fin}`);
+      }
+      if (effectivePeriodeId) qs.push(`id_periode=${effectivePeriodeId}`);
+      const url = `/administration/caisseCreditrice/save/${ids.id_compte}/${ids.id_dossier}/${effectiveExerciceId}${qs.length ? `?${qs.join('&')}` : ''}`;
+      const res = await axiosPrivate.post(url);
+      const n = res.data?.saved ?? 0;
+      await fetchStored();
+      toast.success(`Contrôle terminé : ${n} ligne${n > 1 ? 's' : ''} créditrice(s)`);
+    } catch (e) {
+      console.error('Erreur révision caisse créditrice:', e);
+      toast.error('Erreur lors de la révision');
+    } finally {
+      setRevising(false);
+    }
+  };
+
+  useEffect(() => { fetchStored(); }, [fetchStored]);
 
   const lignes = data?.lignes || [];
   const nbComptes = data?.nbComptes || 0;
@@ -112,7 +136,7 @@ const CaisseCreditrice = ({ id_exercice, id_periode }) => {
         <Stack direction="row" divider={<Box sx={{ width: '1px', bgcolor: T.line }} />} flexWrap="wrap">
           <StatCell label="Comptes caisse concernés" value={nbComptes} color={anomalie ? T.neg : T.pos} />
           <StatCell label="Lignes créditrices" value={nbNegatives} color={anomalie ? T.neg : T.pos} />
-          <Box sx={{ flex: 1, minWidth: 0, p: { xs: 2, md: 2.5 }, display: 'flex', alignItems: 'center' }}>
+          <Box sx={{ flex: 1, minWidth: 0, p: { xs: 2, md: 2.5 }, display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
             <Chip
               icon={anomalie ? <WarningAmberOutlined sx={{ fontSize: 18 }} /> : <CheckCircleOutline sx={{ fontSize: 18 }} />}
               label={anomalie ? 'Caisse négative détectée' : 'Aucune caisse négative'}
@@ -123,16 +147,21 @@ const CaisseCreditrice = ({ id_exercice, id_periode }) => {
                 '& .MuiChip-icon': { color: 'inherit' },
               }}
             />
+            <Button
+              variant="contained"
+              disableElevation
+              startIcon={revising ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <RestartAltOutlined />}
+              onClick={handleReviser}
+              disabled={revising}
+              sx={{ ml: 'auto', bgcolor: T.accent, textTransform: 'none', fontWeight: 700, '&:hover': { bgcolor: '#0B6870' } }}
+            >
+              {revising ? 'Révision…' : 'Réviser'}
+            </Button>
           </Box>
         </Stack>
       </Box>
 
-      {lignes.length === 0 ? (
-        <Alert severity="success" icon={<CheckCircleOutline />} sx={{ borderRadius: '12px' }}>
-          Aucune caisse (comptes 53x) n'a été créditrice — les soldes cumulés restent positifs.
-        </Alert>
-      ) : (
-        <TableContainer sx={{ border: `1px solid ${T.line}`, borderRadius: '14px', overflowX: 'auto' }}>
+      <TableContainer sx={{ border: `1px solid ${T.line}`, borderRadius: '14px', overflowX: 'auto' }}>
           <Table size="small" stickyHeader sx={{ '& td, & th': { fontSize: '0.8rem', py: 0.6, px: 1.5, borderBottom: `1px solid ${T.ledger}` } }}>
             <TableHead>
               <TableRow sx={{ '& th': { bgcolor: '#F8FAFC', color: '#64748B', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.4px' } }}>
@@ -144,6 +173,15 @@ const CaisseCreditrice = ({ id_exercice, id_periode }) => {
               </TableRow>
             </TableHead>
             <TableBody>
+              {groups.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} sx={{ textAlign: 'center', color: T.faint, py: 5 }}>
+                    {revising
+                      ? 'Révision en cours…'
+                      : 'Aucune donnée enregistrée. Cliquez sur « Réviser » pour lancer le contrôle.'}
+                  </TableCell>
+                </TableRow>
+              )}
               {groups.map((grp, gi) => (
                 <React.Fragment key={`grp-${grp.compte}-${gi}`}>
                   {/* En-tête du compte caisse (filet vert entre comptes) */}
@@ -166,7 +204,6 @@ const CaisseCreditrice = ({ id_exercice, id_periode }) => {
             </TableBody>
           </Table>
         </TableContainer>
-      )}
     </Box>
   );
 };

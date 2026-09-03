@@ -83,6 +83,9 @@ app.use('/paramExercice', require('./Routes/parametres/exerciceRoute')); // alia
 
 app.use('/param/revisionControleMatrix', require('./Routes/parametres/revisionControleMatrixRoute'));
 
+// Paramétrage des taux de TVA par dossier
+app.use('/paramTauxTva', require('./Routes/parametres/tauxTvaParamRoute'));
+
 // Codes Journaux
 app.use('/param/codejournals', require('./Routes/parametres/codejournalsRoute'));
 app.use('/paramCodeJournaux', require('./Routes/parametres/codejournalsRoute')); // alias
@@ -152,6 +155,9 @@ app.use('/administration/caisseCreditrice', require('./Routes/Administration/cai
 
 // Route pour le contrôle Cohérence HT / TVA / TTC
 app.use('/administration/coherenceHtTva', require('./Routes/Administration/coherenceHtTvaRoutes'));
+
+// Route pour le contrôle Taux de TVA (copie de cohérence, affichage centré sur le taux)
+app.use('/administration/tauxTva', require('./Routes/Administration/tauxTvaRoutes'));
 
 // Routes pour la révision analytique
 app.use('/administration/revisionAnalytique', require('./Routes/Administration/revisionAnalytiqueRoute'));
