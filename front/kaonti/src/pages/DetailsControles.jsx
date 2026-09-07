@@ -33,6 +33,7 @@ import EquilibreDebitCredit from './listecontroles/EquilibreDebitCredit';
 import CaisseCreditrice from './listecontroles/CaisseCreditrice';
 import CoherenceHtTva from './listecontroles/CoherenceHtTva';
 import TauxTva from './listecontroles/TauxTva';
+import SequenceCheque from './listecontroles/SequenceCheque';
 import ExercicePeriodeSelector from './ExercicePeriodeSelector';
 
 // ─── Système de design (aligné sur ExportBalance / le tableau de bord) ───
@@ -104,7 +105,7 @@ const CONTROL_GROUPS = [
       {
         cycle: 'Trésorerie',
         items: [
-          { id: 'sequenceCheques', label: 'Séquence des numéros de chèque', icon: PH, placeholder: true },
+          { id: 'sequenceCheques', label: 'Séquence des numéros de chèque', icon: <ReceiptLongOutlined sx={{ fontSize: 20 }} /> },
           { id: 'caisseCreditrice', label: 'Caisse créditrice (solde 53 négatif — impossible physiquement)', icon: <PointOfSaleOutlined sx={{ fontSize: 20 }} /> },
           { id: 'banqueNonPointee', label: 'Écritures de banque non pointées / rapprochement bancaire', icon: PH, placeholder: true },
           { id: 'virementsInternes', label: 'Virements internes (compte 58) non soldés', icon: PH, placeholder: true },
@@ -530,6 +531,12 @@ const DetailsControles = () => {
             )}
             {activeControl === 'tauxTva' && (
               <TauxTva
+                id_exercice={selectedExerciceId}
+                id_periode={selectedPeriodeId}
+              />
+            )}
+            {activeControl === 'sequenceCheques' && (
+              <SequenceCheque
                 id_exercice={selectedExerciceId}
                 id_periode={selectedPeriodeId}
               />

@@ -73,7 +73,7 @@ const SECTIONS_CONFIG = [
       {
         cycle: "Trésorerie",
         items: [
-          { id: "sequenceCheques", title: "Séquence des numéros de chèque", source: { kind: 'todo' }, pending: true, anomalies: 0, remaining: 0 },
+          { id: "sequenceCheques", title: "Séquence des numéros de chèque", source: { kind: 'sequenceCheque' }, anomalies: 0, remaining: 0 },
           { id: "caisseCreditrice", title: "Caisse créditrice (solde 53 négatif — impossible physiquement)", source: { kind: 'caisseCreditrice' }, anomalies: 0, remaining: 0 },
           { id: "banqueNonPointee", title: "Écritures de banque non pointées / rapprochement bancaire", source: { kind: 'todo' }, pending: true, anomalies: 0, remaining: 0 },
           { id: "virementsInternes", title: "Virements internes (compte 58) non soldés", source: { kind: 'todo' }, pending: true, anomalies: 0, remaining: 0 },
@@ -540,8 +540,14 @@ export default function DashboardComponent() {
         tauxTvaUrl += `?id_periode=${selectedPeriodeId}`;
       }
 
+      // Séquence des chèques : nb d'anomalies de séquence, depuis la table, scopé par période.
+      let sequenceChequeUrl = `/administration/sequenceCheque/${id_compte}/${id_dossier}/${id_exercice}/stats`;
+      if (hasPeriode) {
+        sequenceChequeUrl += `?id_periode=${selectedPeriodeId}`;
+      }
+
       // Un seul appel réseau par source, tous en parallèle.
-      const [controleAutoData, doublonsData, fournisseurClientData, revuNN1Data, revuMensuelleData, suspenseData, equilibreData, caisseData, coherenceHtTvaData, tauxTvaData] =
+      const [controleAutoData, doublonsData, fournisseurClientData, revuNN1Data, revuMensuelleData, suspenseData, equilibreData, caisseData, coherenceHtTvaData, tauxTvaData, sequenceChequeData] =
         await Promise.all([
           safeGet(controleAutoUrl),
           safeGet(doublonsUrl),
@@ -553,6 +559,7 @@ export default function DashboardComponent() {
           safeGet(caisseUrl),
           safeGet(coherenceHtTvaUrl),
           safeGet(tauxTvaUrl),
+          safeGet(sequenceChequeUrl),
         ]);
 
       // Map des détails du contrôle auto, indexé par type (= codeCtrl).
@@ -599,6 +606,11 @@ export default function DashboardComponent() {
             return {
               anomalies: tauxTvaData.total_anomalies || 0,
               remaining: tauxTvaData.restantes || 0,
+            };
+          case 'sequenceCheque':
+            return {
+              anomalies: sequenceChequeData.total_anomalies || 0,
+              remaining: sequenceChequeData.restantes || 0,
             };
           case 'revu': {
             const d = source.typeRevue === 'analytiqueMensuelle' ? revuMensuelleData : revuNN1Data;

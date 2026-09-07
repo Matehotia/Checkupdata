@@ -49,6 +49,9 @@ db.periodes = require('./periodesModel')(sequelize, DataTypes);
 //paramétres - taux de TVA par dossier
 db.tauxtva = require('./tauxTvaModel')(sequelize, DataTypes);
 
+//paramétres - Trésorerie (règles opérateur + mot-clé) par dossier
+db.parametrageTresorerie = require('./parametrageTresorerieModel')(sequelize, DataTypes);
+
 //anomalies enregistrées - contrôle cohérence HT/TVA/TTC
 db.coherenceHtTvaAnomalies = require('./coherenceHtTvaAnomaliesModel')(sequelize, DataTypes);
 
@@ -60,6 +63,9 @@ db.caisseCreditriceAnomalies = require('./caisseCreditriceAnomaliesModel')(seque
 
 //anomalies enregistrées - contrôle équilibre débit=crédit
 db.equilibreDcAnomalies = require('./equilibreDcAnomaliesModel')(sequelize, DataTypes);
+
+//résultats enregistrés - contrôle séquence des numéros de chèque
+db.sequenceChequeAnomalies = require('./sequenceChequeAnomaliesModel')(sequelize, DataTypes);
 // db.grille_tarifaires = require('./grilleTarifaire')(sequelize, Sequelize);
 
 // Compte
