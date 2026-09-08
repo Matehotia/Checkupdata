@@ -73,7 +73,7 @@ const SECTIONS_CONFIG = [
       {
         cycle: "Trésorerie",
         items: [
-          { id: "sequenceCheques", title: "Séquence des numéros de chèque", source: { kind: 'todo' }, pending: true, anomalies: 0, remaining: 0 },
+          { id: "sequenceCheques", title: "Séquence des numéros de chèque", source: { kind: 'sequenceCheque' }, anomalies: 0, remaining: 0 },
           { id: "caisseCreditrice", title: "Caisse créditrice (solde 53 négatif — impossible physiquement)", source: { kind: 'caisseCreditrice' }, anomalies: 0, remaining: 0 },
           { id: "banqueNonPointee", title: "Écritures de banque non pointées / rapprochement bancaire", source: { kind: 'todo' }, pending: true, anomalies: 0, remaining: 0 },
           { id: "virementsInternes", title: "Virements internes (compte 58) non soldés", source: { kind: 'todo' }, pending: true, anomalies: 0, remaining: 0 },
@@ -97,7 +97,7 @@ const SECTIONS_CONFIG = [
     items: [
       { id: "utilCptTva", title: "Utilisation des comptes de TVA", source: { kind: 'controleAutoType', codeCtrl: 'UTIL_CPT_TVA' }, anomalies: 0, remaining: 0 },
       { id: "tvaNonDeductible", title: "TVA non déductible", source: { kind: 'todo' }, pending: true, anomalies: 0, remaining: 0 },
-      { id: "tauxTva", title: "Contrôle des taux de TVA", source: { kind: 'todo' }, pending: true, anomalies: 0, remaining: 0 },
+      { id: "tauxTva", title: "Contrôle des taux de TVA", source: { kind: 'tauxTva' }, anomalies: 0, remaining: 0 },
       { id: "concordanceTva", title: "Concordance TVA collectée (4457) / base ventes, et TVA déductible (4456) / base achats", source: { kind: 'todo' }, pending: true, anomalies: 0, remaining: 0 },
       { id: "tvaSansBase", title: "Compte de TVA mouvementé sans base HT correspondante (et inversement)", source: { kind: 'todo' }, pending: true, anomalies: 0, remaining: 0 },
       { id: "concordanceCa3", title: "Concordance comptabilité / déclarations CA3", source: { kind: 'todo' }, pending: true, anomalies: 0, remaining: 0 },
@@ -516,23 +516,38 @@ export default function DashboardComponent() {
         suspenseUrl += `?date_debut=${selectedPeriodeDates.date_debut}&date_fin=${selectedPeriodeDates.date_fin}`;
       }
 
+      // Équilibre débit=crédit : compteur depuis la table (dernier « Réviser »), scopé par période.
       let equilibreUrl = `/administration/equilibreDebitCredit/${id_compte}/${id_dossier}/${id_exercice}/stats`;
-      if (selectedPeriodeDates) {
-        equilibreUrl += `?date_debut=${selectedPeriodeDates.date_debut}&date_fin=${selectedPeriodeDates.date_fin}`;
+      if (hasPeriode) {
+        equilibreUrl += `?id_periode=${selectedPeriodeId}`;
       }
 
+      // Caisse créditrice : compteur depuis la table (dernier « Réviser »), scopé par période.
       let caisseUrl = `/administration/caisseCreditrice/${id_compte}/${id_dossier}/${id_exercice}/stats`;
-      if (selectedPeriodeDates) {
-        caisseUrl += `?date_debut=${selectedPeriodeDates.date_debut}&date_fin=${selectedPeriodeDates.date_fin}`;
+      if (hasPeriode) {
+        caisseUrl += `?id_periode=${selectedPeriodeId}`;
       }
 
+      // Cohérence HT/TVA/TTC : le compteur vient de la table (dernier « Réviser »), scopé par période.
       let coherenceHtTvaUrl = `/administration/coherenceHtTva/${id_compte}/${id_dossier}/${id_exercice}/stats`;
-      if (selectedPeriodeDates) {
-        coherenceHtTvaUrl += `?date_debut=${selectedPeriodeDates.date_debut}&date_fin=${selectedPeriodeDates.date_fin}`;
+      if (hasPeriode) {
+        coherenceHtTvaUrl += `?id_periode=${selectedPeriodeId}`;
+      }
+
+      // Taux de TVA : compteur depuis la table (dernier « Réviser »), scopé par période.
+      let tauxTvaUrl = `/administration/tauxTva/${id_compte}/${id_dossier}/${id_exercice}/stats`;
+      if (hasPeriode) {
+        tauxTvaUrl += `?id_periode=${selectedPeriodeId}`;
+      }
+
+      // Séquence des chèques : nb d'anomalies de séquence, depuis la table, scopé par période.
+      let sequenceChequeUrl = `/administration/sequenceCheque/${id_compte}/${id_dossier}/${id_exercice}/stats`;
+      if (hasPeriode) {
+        sequenceChequeUrl += `?id_periode=${selectedPeriodeId}`;
       }
 
       // Un seul appel réseau par source, tous en parallèle.
-      const [controleAutoData, doublonsData, fournisseurClientData, revuNN1Data, revuMensuelleData, suspenseData, equilibreData, caisseData, coherenceHtTvaData] =
+      const [controleAutoData, doublonsData, fournisseurClientData, revuNN1Data, revuMensuelleData, suspenseData, equilibreData, caisseData, coherenceHtTvaData, tauxTvaData, sequenceChequeData] =
         await Promise.all([
           safeGet(controleAutoUrl),
           safeGet(doublonsUrl),
@@ -543,6 +558,8 @@ export default function DashboardComponent() {
           safeGet(equilibreUrl),
           safeGet(caisseUrl),
           safeGet(coherenceHtTvaUrl),
+          safeGet(tauxTvaUrl),
+          safeGet(sequenceChequeUrl),
         ]);
 
       // Map des détails du contrôle auto, indexé par type (= codeCtrl).
@@ -584,6 +601,16 @@ export default function DashboardComponent() {
             return {
               anomalies: coherenceHtTvaData.total_anomalies || 0,
               remaining: coherenceHtTvaData.restantes || 0,
+            };
+          case 'tauxTva':
+            return {
+              anomalies: tauxTvaData.total_anomalies || 0,
+              remaining: tauxTvaData.restantes || 0,
+            };
+          case 'sequenceCheque':
+            return {
+              anomalies: sequenceChequeData.total_anomalies || 0,
+              remaining: sequenceChequeData.restantes || 0,
             };
           case 'revu': {
             const d = source.typeRevue === 'analytiqueMensuelle' ? revuMensuelleData : revuNN1Data;

@@ -1,14 +1,5 @@
 const db = require('../../Models');
 
-/**
- * Contrôle « Cohérence HT / TVA / TTC » (structurel, sans contrôle de taux).
- * Par écriture-facture (au moins une ligne HT 6/7 ET une ligne tiers 401/411),
- * on vérifie : (TTC + retenue) = HT + TVA, TVA ≤ HT, HT ≤ (TTC + retenue).
- * Les montants sont arrondis au centime (ROUND(..,2)) avant comparaison : cela supprime
- * le bruit flottant (double precision) tout en gardant anomalie toute différence ≥ 0,01.
- * La retenue à la source (44x hors 445) règle la facture au même titre que le tiers,
- * elle est donc intégrée au côté TTC pour éviter les faux positifs.
- */
 const computeCoherence = async (id_compte, id_dossier, id_exercice, date_debut, date_fin) => {
   const dateFilter = (date_debut && date_fin)
     ? 'AND dateecriture BETWEEN :date_debut AND :date_fin'
@@ -127,12 +118,18 @@ const computeCoherence = async (id_compte, id_dossier, id_exercice, date_debut, 
     const nA = Number(r.n_achat) || 0;
     const nV = Number(r.n_vente) || 0;
     const type = (nA > 0 && nV > 0) ? 'Mixte' : (nV > 0 ? 'Vente' : 'Achat');
+    const det = detailByKey[`${r.id_ecriture}||${r.piece}`] || [];
+    const compte_ht = (det.find((d) => {
+      const c = String(d.comptegen || '').trim();
+      return c[0] === '6' || c[0] === '7';
+    }) || {}).comptegen || null;
     return {
       id_ecriture: r.id_ecriture,
       dateecriture: r.dateecriture,
       piece: r.piece,
       libelle: r.libelle,
       type,
+      compte_ht,
       total_debit: Number(r.total_debit) || 0,
       total_credit: Number(r.total_credit) || 0,
       ht: Number(r.ht) || 0,
@@ -167,13 +164,21 @@ exports.getCoherenceHtTva = async (req, res) => {
   }
 };
 
-// Stats pour le dashboard : nombre d'écritures incohérentes.
+// Stats pour le dashboard : nombre d'anomalies ENREGISTRÉES (lues depuis la table,
+// pas de recalcul). Cohérent avec l'écran Détails qui affiche aussi la table.
 exports.getStats = async (req, res) => {
   try {
     const { id_compte, id_dossier, id_exercice } = req.params;
-    const { date_debut, date_fin } = req.query;
+    const { id_periode } = req.query;
 
-    const { nbEcritures } = await computeCoherence(id_compte, id_dossier, id_exercice, date_debut, date_fin);
+    const scope = {
+      id_compte: parseInt(id_compte, 10),
+      id_dossier: parseInt(id_dossier, 10),
+      id_exercice: parseInt(id_exercice, 10),
+      id_periode: (id_periode !== undefined && id_periode !== '') ? parseInt(id_periode, 10) : null,
+    };
+
+    const nbEcritures = await db.coherenceHtTvaAnomalies.count({ where: scope });
 
     return res.json({
       state: true,
@@ -187,5 +192,127 @@ exports.getStats = async (req, res) => {
   } catch (error) {
     console.error('[COHERENCE_HT_TVA] stats error:', error);
     return res.status(500).json({ state: false, msg: 'Erreur serveur', error: error.message });
+  }
+};
+
+// Lit les anomalies enregistrées (table) + rattache le détail en live via id_ecriture.
+exports.getStored = async (req, res) => {
+  try {
+    const { id_compte, id_dossier, id_exercice } = req.params;
+    const { id_periode } = req.query;
+
+    const scope = {
+      id_compte: parseInt(id_compte, 10),
+      id_dossier: parseInt(id_dossier, 10),
+      id_exercice: parseInt(id_exercice, 10),
+      id_periode: (id_periode !== undefined && id_periode !== '') ? parseInt(id_periode, 10) : null,
+    };
+
+    const rows = await db.coherenceHtTvaAnomalies.findAll({
+      where: scope,
+      order: [['dateecriture', 'ASC'], ['id', 'ASC']],
+    });
+
+    // Détail (lignes de l'écriture) rattaché en live
+    const detailByKey = {};
+    const ecritureIds = [...new Set(rows.map((r) => r.id_ecriture))];
+    if (ecritureIds.length > 0) {
+      const detailRows = await db.sequelize.query(
+        `SELECT id_ecriture, TRIM(piece) AS piece, TRIM(comptegen) AS comptegen, compteaux, libelle,
+                COALESCE(debit,0) AS debit, COALESCE(credit,0) AS credit
+         FROM journals
+         WHERE id_compte = :id_compte AND id_dossier = :id_dossier AND id_exercice = :id_exercice
+           AND id_journal IN (SELECT id FROM codejournals WHERE type IN ('ACHAT','VENTE'))
+           AND id_ecriture IN (:ecritureIds)
+         ORDER BY id_ecriture, id`,
+        {
+          replacements: {
+            id_compte: scope.id_compte, id_dossier: scope.id_dossier,
+            id_exercice: scope.id_exercice, ecritureIds,
+          },
+          type: db.Sequelize.QueryTypes.SELECT,
+        }
+      );
+      detailRows.forEach((l) => {
+        const key = `${l.id_ecriture}||${l.piece}`;
+        (detailByKey[key] || (detailByKey[key] = [])).push({
+          comptegen: l.comptegen,
+          compteaux: l.compteaux,
+          libelle: l.libelle,
+          debit: Number(l.debit) || 0,
+          credit: Number(l.credit) || 0,
+        });
+      });
+    }
+
+    const lignes = rows.map((r) => ({
+      id_ecriture: r.id_ecriture,
+      dateecriture: r.dateecriture,
+      piece: r.piece,
+      libelle: r.libelle,
+      type: r.type,
+      ht: Number(r.ht) || 0,
+      tva: Number(r.tva) || 0,
+      ttc: Number(r.ttc) || 0,
+      ttc_reel: Number(r.ttc) || 0,
+      ecart: Number(r.ecart) || 0,
+      motifs: r.motifs ? String(r.motifs).split(' | ') : [],
+      detail: detailByKey[`${r.id_ecriture}||${r.piece}`] || [],
+    }));
+
+    return res.json({ state: true, data: { lignes, nbEcritures: lignes.length }, count: lignes.length });
+  } catch (error) {
+    console.error('[COHERENCE_HT_TVA] stored error:', error);
+    return res.status(500).json({ state: false, message: 'Erreur serveur', error: error.message });
+  }
+};
+
+// Enregistre les anomalies dans la table coherence_ht_tva_anomalies.
+// Remplace les anomalies existantes du même périmètre (compte/dossier/exercice/période).
+exports.saveCoherence = async (req, res) => {
+  try {
+    const { id_compte, id_dossier, id_exercice } = req.params;
+    const { date_debut, date_fin, id_periode } = req.query;
+
+    if (!id_compte || !id_dossier || !id_exercice) {
+      return res.status(400).json({ state: false, message: 'Paramètres manquants' });
+    }
+
+    const { lignes } = await computeCoherence(id_compte, id_dossier, id_exercice, date_debut, date_fin);
+
+    const scope = {
+      id_compte: parseInt(id_compte, 10),
+      id_dossier: parseInt(id_dossier, 10),
+      id_exercice: parseInt(id_exercice, 10),
+      id_periode: (id_periode !== undefined && id_periode !== '') ? parseInt(id_periode, 10) : null,
+    };
+
+    await db.sequelize.transaction(async (t) => {
+      await db.coherenceHtTvaAnomalies.destroy({ where: scope, transaction: t });
+      if (lignes.length > 0) {
+        await db.coherenceHtTvaAnomalies.bulkCreate(
+          lignes.map((l) => ({
+            ...scope,
+            id_ecriture: l.id_ecriture,
+            piece: l.piece,
+            id_num_compte: l.compte_ht,
+            dateecriture: l.dateecriture,
+            libelle: l.libelle,
+            type: l.type,
+            ht: l.ht,
+            tva: l.tva,
+            ttc: l.ttc_reel,
+            ecart: l.ecart,
+            motifs: (l.motifs || []).join(' | '),
+          })),
+          { transaction: t }
+        );
+      }
+    });
+
+    return res.json({ state: true, saved: lignes.length });
+  } catch (error) {
+    console.error('[COHERENCE_HT_TVA] save error:', error);
+    return res.status(500).json({ state: false, message: 'Erreur serveur', error: error.message });
   }
 };

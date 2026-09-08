@@ -120,17 +120,26 @@ exports.getEquilibre = async (req, res) => {
   }
 };
 
-// Stats pour le dashboard : nombre d'anomalies = écritures déséquilibrées (+ déséquilibre global résiduel).
+const scopeOf = (id_compte, id_dossier, id_exercice, id_periode) => ({
+  id_compte: parseInt(id_compte, 10),
+  id_dossier: parseInt(id_dossier, 10),
+  id_exercice: parseInt(id_exercice, 10),
+  id_periode: (id_periode !== undefined && id_periode !== '') ? parseInt(id_periode, 10) : null,
+});
+
+// Stats pour le dashboard : anomalies ENREGISTRÉES (table), pas de recalcul.
 exports.getStats = async (req, res) => {
   try {
     const { id_compte, id_dossier, id_exercice } = req.params;
-    const { date_debut, date_fin } = req.query;
+    const { id_periode } = req.query;
+    const scope = scopeOf(id_compte, id_dossier, id_exercice, id_periode);
 
-    const { global, ecritures } = await computeEquilibre(id_compte, id_dossier, id_exercice, date_debut, date_fin);
+    const nbEcritures = await db.equilibreDcAnomalies.count({ where: { ...scope, type: 'ECRITURE' } });
+    const globalRow = await db.equilibreDcAnomalies.findOne({ where: { ...scope, type: 'GLOBAL' } });
+    const globalEquilibre = globalRow ? globalRow.equilibre : true;
 
-    // Une écriture fautive = une anomalie. Cas limite : global déséquilibré alors qu'aucune
-    // écriture ne dépasse la tolérance (accumulation de micro-écarts) -> on compte 1 anomalie globale.
-    const nb = ecritures.length + ((!global.equilibre && ecritures.length === 0) ? 1 : 0);
+    // Cas limite : global déséquilibré alors qu'aucune écriture ne dépasse la tolérance -> 1 anomalie.
+    const nb = nbEcritures + ((!globalEquilibre && nbEcritures === 0) ? 1 : 0);
 
     return res.json({
       state: true,
@@ -139,13 +148,111 @@ exports.getStats = async (req, res) => {
         total: nb,
         restantes: nb,
         nonValide: nb,
-        nbEcrituresDesequilibrees: ecritures.length,
-        global_ecart: global.ecart,
-        global_equilibre: global.equilibre,
+        nbEcrituresDesequilibrees: nbEcritures,
+        global_ecart: globalRow ? Number(globalRow.ecart) || 0 : 0,
+        global_equilibre: globalEquilibre,
       },
     });
   } catch (error) {
     console.error('[EQUILIBRE_DC] stats error:', error);
     return res.status(500).json({ state: false, msg: 'Erreur serveur', error: error.message });
+  }
+};
+
+// Lit les anomalies enregistrées (table) + détail des lignes en live via id_ecriture.
+exports.getStored = async (req, res) => {
+  try {
+    const { id_compte, id_dossier, id_exercice } = req.params;
+    const { id_periode } = req.query;
+    const scope = scopeOf(id_compte, id_dossier, id_exercice, id_periode);
+
+    const rows = await db.equilibreDcAnomalies.findAll({
+      where: scope,
+      order: [['type', 'ASC'], ['id', 'ASC']],
+    });
+
+    const globalRow = rows.find((r) => r.type === 'GLOBAL');
+    const global = {
+      total_debit: globalRow ? Number(globalRow.total_debit) || 0 : 0,
+      total_credit: globalRow ? Number(globalRow.total_credit) || 0 : 0,
+      ecart: globalRow ? Number(globalRow.ecart) || 0 : 0,
+      equilibre: globalRow ? globalRow.equilibre : true,
+    };
+
+    const ecritures = rows
+      .filter((r) => r.type === 'ECRITURE')
+      .map((r) => ({
+        id_ecriture: r.id_ecriture,
+        total_debit: Number(r.total_debit) || 0,
+        total_credit: Number(r.total_credit) || 0,
+        ecart: Number(r.ecart) || 0,
+      }));
+
+    // Lignes détaillées (live) des écritures déséquilibrées
+    let lignes = [];
+    const ecritureIds = ecritures.map((e) => e.id_ecriture).filter((v) => v !== null && v !== undefined && v !== '');
+    if (ecritureIds.length > 0) {
+      lignes = await db.journals.findAll({
+        where: {
+          id_compte: scope.id_compte,
+          id_dossier: scope.id_dossier,
+          id_exercice: scope.id_exercice,
+          id_ecriture: { [Op.in]: ecritureIds },
+        },
+        attributes: ['id', 'id_ecriture', 'dateecriture', 'comptegen', 'compteaux', 'piece', 'libelle', 'debit', 'credit', 'lettrage'],
+        order: [['id_ecriture', 'ASC'], ['id', 'ASC']],
+        raw: true,
+      });
+    }
+
+    return res.json({ state: true, data: { global, ecritures, lignes, revised: !!globalRow }, count: ecritures.length });
+  } catch (error) {
+    console.error('[EQUILIBRE_DC] stored error:', error);
+    return res.status(500).json({ state: false, message: 'Erreur serveur', error: error.message });
+  }
+};
+
+// Réviser = recalcule + enregistre (remplace le périmètre).
+exports.saveEquilibre = async (req, res) => {
+  try {
+    const { id_compte, id_dossier, id_exercice } = req.params;
+    const { date_debut, date_fin, id_periode } = req.query;
+
+    if (!id_compte || !id_dossier || !id_exercice) {
+      return res.status(400).json({ state: false, message: 'Paramètres manquants' });
+    }
+
+    const { global, ecritures } = await computeEquilibre(id_compte, id_dossier, id_exercice, date_debut, date_fin);
+    const scope = scopeOf(id_compte, id_dossier, id_exercice, id_periode);
+
+    await db.sequelize.transaction(async (t) => {
+      await db.equilibreDcAnomalies.destroy({ where: scope, transaction: t });
+      const records = [{
+        ...scope,
+        type: 'GLOBAL',
+        id_ecriture: null,
+        total_debit: global.total_debit,
+        total_credit: global.total_credit,
+        ecart: global.ecart,
+        equilibre: global.equilibre,
+      }];
+      ecritures.forEach((e) => {
+        records.push({
+          ...scope,
+          type: 'ECRITURE',
+          id_ecriture: e.id_ecriture,
+          total_debit: e.total_debit,
+          total_credit: e.total_credit,
+          ecart: e.ecart,
+          equilibre: false,
+        });
+      });
+      await db.equilibreDcAnomalies.bulkCreate(records, { transaction: t });
+    });
+
+    return res.json({ state: true, saved: ecritures.length });
+  } catch (error) {
+    console.error('[EQUILIBRE_DC] save error:', error);
+    return res.status(500).json({ state: false, message: 'Erreur serveur', error: error.message });
   }
 };

@@ -12,8 +12,8 @@ import {
   SettingsOutlined, NavigateNext, BusinessOutlined,
   AddOutlined, EditOutlined, DeleteOutline, SaveOutlined,
   AnalyticsOutlined, MenuBookOutlined, AccountTreeOutlined,
-  ListAltOutlined, AdminPanelSettingsOutlined, CheckOutlined, CloseOutlined, 
-  DashboardOutlined,
+  ListAltOutlined, AdminPanelSettingsOutlined, CheckOutlined, CloseOutlined,
+  DashboardOutlined, PercentOutlined, AccountBalanceOutlined,
 
 } from '@mui/icons-material';
 import AccessTimeOutlined from '@mui/icons-material/AccessTimeOutlined';
@@ -503,7 +503,7 @@ const CodesJournauxDataGrid = ({ fileId, compteId, axiosPrivate, pc }) => {
 const AnalytiqueDataGrid = ({ fileId, compteId, axiosPrivate }) => {
   const [axes, setAxes] = useState([]);
   const [sections, setSections] = useState([]);
-  const [selectedAxe, setSelectedAxe] = useState(null);
+  const [selectedAxe, setSelectedAxe] = useState(null);é
   const [loadingAxes, setLoadingAxes] = useState(false);
   const [loadingSections, setLoadingSections] = useState(false);
   const [axeRowModesModel, setAxeRowModesModel] = useState({});
@@ -2099,6 +2099,24 @@ const CRM = () => {
   const [confirmSeuilOpen, setConfirmSeuilOpen] = useState(false);
   const [confirmSeuilLoading, setConfirmSeuilLoading] = useState(false);
   const [pendingSeuilValue, setPendingSeuilValue] = useState(null);
+
+  // --- Taux TVA (paramétrage) ---
+  const [tauxTvaList, setTauxTvaList] = useState([]);
+  const [tauxTvaLoading, setTauxTvaLoading] = useState(false);
+  const [newTauxDeductible, setNewTauxDeductible] = useState(true);
+  const [newTauxValue, setNewTauxValue] = useState('');
+  const [editTauxId, setEditTauxId] = useState(null);
+  const [editTauxDeductible, setEditTauxDeductible] = useState(true);
+  const [editTauxValue, setEditTauxValue] = useState('');
+
+  // --- Trésorerie (paramétrage : opérateur + mot-clé) ---
+  const [tresoList, setTresoList] = useState([]);
+  const [tresoLoading, setTresoLoading] = useState(false);
+  const [newTresoOperateur, setNewTresoOperateur] = useState('cont');
+  const [newTresoMotCle, setNewTresoMotCle] = useState('');
+  const [editTresoId, setEditTresoId] = useState(null);
+  const [editTresoOperateur, setEditTresoOperateur] = useState('cont');
+  const [editTresoMotCle, setEditTresoMotCle] = useState('');
   const [crmData, setCrmData] = useState(null);
 
   const formikNewJournal = useFormik({
@@ -2332,6 +2350,142 @@ const CRM = () => {
     }
   };
 
+  // --- Taux TVA (paramétrage) ---
+  const fetchTauxTva = async () => {
+    if (!fileId || fileId === '0' || !compteId) return;
+    setTauxTvaLoading(true);
+    try {
+      const res = await axiosPrivate.get(`/paramTauxTva/${compteId}/${fileId}`);
+      if (res.data?.state) setTauxTvaList(res.data.data || []);
+    } catch (e) {
+      console.error('Erreur chargement taux TVA', e);
+    } finally {
+      setTauxTvaLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 6) fetchTauxTva();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, fileId]);
+
+  const handleAddTaux = async () => {
+    const v = Number(String(newTauxValue).replace(',', '.'));
+    if (isNaN(v) || v < 0) { toast.error('Taux invalide'); return; }
+    try {
+      await axiosPrivate.post('/paramTauxTva', {
+        id_compte: compteId, id_dossier: fileId, deductible: newTauxDeductible, taux: v,
+      });
+      setNewTauxValue('');
+      await fetchTauxTva();
+      toast.success('Taux ajouté');
+    } catch (e) {
+      toast.error('Erreur lors de l\'ajout');
+    }
+  };
+
+  const handleDeleteTaux = async (id) => {
+    try {
+      await axiosPrivate.delete(`/paramTauxTva/${id}`);
+      await fetchTauxTva();
+      toast.success('Taux supprimé');
+    } catch (e) {
+      toast.error('Erreur lors de la suppression');
+    }
+  };
+
+  const startEditTaux = (row) => {
+    setEditTauxId(row.id);
+    setEditTauxDeductible(row.deductible);
+    setEditTauxValue(String(row.taux));
+  };
+
+  const cancelEditTaux = () => {
+    setEditTauxId(null);
+    setEditTauxValue('');
+  };
+
+  const saveEditTaux = async () => {
+    const v = Number(String(editTauxValue).replace(',', '.'));
+    if (isNaN(v) || v < 0) { toast.error('Taux invalide'); return; }
+    try {
+      await axiosPrivate.put(`/paramTauxTva/${editTauxId}`, { deductible: editTauxDeductible, taux: v });
+      cancelEditTaux();
+      await fetchTauxTva();
+      toast.success('Taux modifié');
+    } catch (e) {
+      toast.error('Erreur lors de la modification');
+    }
+  };
+
+  // --- Trésorerie (paramétrage : opérateur + mot-clé) ---
+  const fetchTresorerie = async () => {
+    if (!fileId || fileId === '0' || !compteId) return;
+    setTresoLoading(true);
+    try {
+      const res = await axiosPrivate.get(`/paramTresorerie/${compteId}/${fileId}`);
+      if (res.data?.state) setTresoList(res.data.data || []);
+    } catch (e) {
+      console.error('Erreur chargement Trésorerie', e);
+    } finally {
+      setTresoLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 7) fetchTresorerie();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, fileId]);
+
+  const handleAddTreso = async () => {
+    if (!newTresoMotCle.trim()) { toast.error('Mot-clé requis'); return; }
+    try {
+      await axiosPrivate.post('/paramTresorerie', {
+        id_compte: compteId, id_dossier: fileId, operateur: newTresoOperateur, mot_cle: newTresoMotCle.trim(),
+      });
+      setNewTresoMotCle('');
+      await fetchTresorerie();
+      toast.success('Règle ajoutée');
+    } catch (e) {
+      toast.error('Erreur lors de l\'ajout');
+    }
+  };
+
+  const handleDeleteTreso = async (id) => {
+    try {
+      await axiosPrivate.delete(`/paramTresorerie/${id}`);
+      await fetchTresorerie();
+      toast.success('Règle supprimée');
+    } catch (e) {
+      toast.error('Erreur lors de la suppression');
+    }
+  };
+
+  const startEditTreso = (row) => {
+    setEditTresoId(row.id);
+    setEditTresoOperateur(row.operateur);
+    setEditTresoMotCle(row.mot_cle);
+  };
+
+  const cancelEditTreso = () => {
+    setEditTresoId(null);
+    setEditTresoMotCle('');
+  };
+
+  const saveEditTreso = async () => {
+    if (!editTresoMotCle.trim()) { toast.error('Mot-clé requis'); return; }
+    try {
+      await axiosPrivate.put(`/paramTresorerie/${editTresoId}`, { operateur: editTresoOperateur, mot_cle: editTresoMotCle.trim() });
+      cancelEditTreso();
+      await fetchTresorerie();
+      toast.success('Règle modifiée');
+    } catch (e) {
+      toast.error('Erreur lors de la modification');
+    }
+  };
+
+  const tresoOpLabel = (op) => (op === 'com_par' ? 'Commence par' : op === '=' ? 'Égal à' : 'Contient');
+
   // Style Header Tableau (Pro & Minimaliste)
   const headerStyle = {
     fontWeight: 800,
@@ -2483,6 +2637,8 @@ const CRM = () => {
               { value: 3, label: 'Analytique', icon: <AccountTreeOutlined /> },
               { value: 5, label: 'Comptes TVA', icon: <AnalyticsOutlined /> },
               { value: 0, label: 'Seuils', icon: <SettingsOutlined /> },
+              { value: 6, label: 'Taux TVA', icon: <PercentOutlined /> },
+              { value: 7, label: 'Trésorerie', icon: <AccountBalanceOutlined /> },
             ].map((s) => {
               const active = activeTab === s.value;
               return (
@@ -2585,6 +2741,264 @@ const CRM = () => {
                   </Paper>
                 </Grid>
               </Grid>
+            </Box>
+          )}
+
+          {/* TAUX TVA */}
+          {activeTab === 6 && (
+            <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+              <Paper elevation={0} sx={{ ...panelSx, p: 3 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <PercentOutlined sx={{ color: T.accent }} /> Taux de TVA
+                </Typography>
+
+                {/* Formulaire d'ajout */}
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'flex-end' }} sx={{ mb: 3 }}>
+                  <Box sx={{ minWidth: 200 }}>
+                    <FieldLabel>Type de TVA</FieldLabel>
+                    <Select
+                      value={newTauxDeductible ? 'deductible' : 'collectee'}
+                      onChange={(e) => setNewTauxDeductible(e.target.value === 'deductible')}
+                      size="small"
+                      fullWidth
+                    >
+                      <MenuItem value="deductible">Déductible</MenuItem>
+                      <MenuItem value="collectee">Collectée</MenuItem>
+                    </Select>
+                  </Box>
+                  <Box sx={{ minWidth: 160 }}>
+                    <FieldLabel>Taux (%)</FieldLabel>
+                    <TextField
+                      value={newTauxValue}
+                      onChange={(e) => setNewTauxValue(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleAddTaux(); }}
+                      type="number"
+                      size="small"
+                      placeholder="20"
+                      fullWidth
+                    />
+                  </Box>
+                  <Button
+                    variant="contained"
+                    disableElevation
+                    startIcon={<AddOutlined />}
+                    sx={{ ...primaryBtnSx, height: '40px' }}
+                    onClick={handleAddTaux}
+                  >
+                    Ajouter
+                  </Button>
+                </Stack>
+
+                {/* Liste des taux paramétrés */}
+                <TableContainer sx={{ border: `1px solid ${T.line}`, borderRadius: '12px' }}>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow sx={{ '& th': { bgcolor: '#F8FAFC', color: '#64748B', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.4px' } }}>
+                        <TableCell>Type</TableCell>
+                        <TableCell align="right">Taux</TableCell>
+                        <TableCell align="right" sx={{ width: 90 }}>Action</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {tauxTvaList.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={3} sx={{ textAlign: 'center', color: T.faint, py: 3 }}>
+                            {tauxTvaLoading ? 'Chargement…' : 'Aucun taux paramétré'}
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        tauxTvaList.map((row) => (
+                          editTauxId === row.id ? (
+                            <TableRow key={row.id}>
+                              <TableCell>
+                                <Select
+                                  value={editTauxDeductible ? 'deductible' : 'collectee'}
+                                  onChange={(e) => setEditTauxDeductible(e.target.value === 'deductible')}
+                                  size="small"
+                                  sx={{ minWidth: 180 }}
+                                >
+                                  <MenuItem value="deductible">Déductible (achats)</MenuItem>
+                                  <MenuItem value="collectee">Collectée (ventes)</MenuItem>
+                                </Select>
+                              </TableCell>
+                              <TableCell align="right">
+                                <TextField
+                                  value={editTauxValue}
+                                  onChange={(e) => setEditTauxValue(e.target.value)}
+                                  onKeyDown={(e) => { if (e.key === 'Enter') saveEditTaux(); if (e.key === 'Escape') cancelEditTaux(); }}
+                                  type="number"
+                                  size="small"
+                                  sx={{ width: 110 }}
+                                  autoFocus
+                                />
+                              </TableCell>
+                              <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                                <IconButton size="small" onClick={saveEditTaux} sx={{ color: T.accent }}>
+                                  <CheckOutlined fontSize="small" />
+                                </IconButton>
+                                <IconButton size="small" onClick={cancelEditTaux} sx={{ color: T.faint }}>
+                                  <CloseOutlined fontSize="small" />
+                                </IconButton>
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            <TableRow key={row.id} hover>
+                              <TableCell>
+                                <Chip
+                                  label={row.deductible ? 'Déductible' : 'Collectée'}
+                                  size="small"
+                                  sx={{
+                                    bgcolor: row.deductible ? T.accW : '#FDF2E9',
+                                    color: row.deductible ? T.accent : '#B5791A',
+                                    fontWeight: 700, fontSize: '11px',
+                                  }}
+                                />
+                              </TableCell>
+                              <TableCell align="right" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                                {Number(row.taux).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} %
+                              </TableCell>
+                              <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                                <IconButton size="small" onClick={() => startEditTaux(row)} sx={{ color: T.muted }}>
+                                  <EditOutlined fontSize="small" />
+                                </IconButton>
+                                <IconButton size="small" onClick={() => handleDeleteTaux(row.id)} sx={{ color: T.neg }}>
+                                  <DeleteOutline fontSize="small" />
+                                </IconButton>
+                              </TableCell>
+                            </TableRow>
+                          )
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Paper>
+            </Box>
+          )}
+
+          {/* TRÉSORERIE */}
+          {activeTab === 7 && (
+            <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+              <Paper elevation={0} sx={{ ...panelSx, p: 3 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <AccountBalanceOutlined sx={{ color: T.accent }} /> Trésorerie
+                </Typography>
+
+                {/* Formulaire d'ajout */}
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'flex-end' }} sx={{ mb: 3 }}>
+                  <Box sx={{ minWidth: 200 }}>
+                    <FieldLabel>Filtre</FieldLabel>
+                    <Select
+                      value={newTresoOperateur}
+                      onChange={(e) => setNewTresoOperateur(e.target.value)}
+                      size="small"
+                      fullWidth
+                    >
+                      <MenuItem value="cont">Contient</MenuItem>
+                      <MenuItem value="com_par">Commence par</MenuItem>
+                      <MenuItem value="=">Égal à</MenuItem>
+                    </Select>
+                  </Box>
+                  <Box sx={{ flex: 1, minWidth: 200 }}>
+                    <FieldLabel>Mot-clé</FieldLabel>
+                    <TextField
+                      value={newTresoMotCle}
+                      onChange={(e) => setNewTresoMotCle(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleAddTreso(); }}
+                      size="small"
+                      placeholder="ex. 512 ou BANQUE"
+                      fullWidth
+                    />
+                  </Box>
+                  <Button
+                    variant="contained"
+                    disableElevation
+                    startIcon={<AddOutlined />}
+                    sx={{ ...primaryBtnSx, height: '40px' }}
+                    onClick={handleAddTreso}
+                  >
+                    Ajouter
+                  </Button>
+                </Stack>
+
+                {/* Liste des règles */}
+                <TableContainer sx={{ border: `1px solid ${T.line}`, borderRadius: '12px' }}>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow sx={{ '& th': { bgcolor: '#F8FAFC', color: '#64748B', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.4px' } }}>
+                        <TableCell>Filtre</TableCell>
+                        <TableCell>Mot-clé</TableCell>
+                        <TableCell align="right" sx={{ width: 90 }}>Action</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {tresoList.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={3} sx={{ textAlign: 'center', color: T.faint, py: 3 }}>
+                            {tresoLoading ? 'Chargement…' : 'Aucune règle paramétrée'}
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        tresoList.map((row) => (
+                          editTresoId === row.id ? (
+                            <TableRow key={row.id}>
+                              <TableCell>
+                                <Select
+                                  value={editTresoOperateur}
+                                  onChange={(e) => setEditTresoOperateur(e.target.value)}
+                                  size="small"
+                                  sx={{ minWidth: 160 }}
+                                >
+                                  <MenuItem value="cont">Qui Contient</MenuItem>
+                                  <MenuItem value="com_par">Commence par</MenuItem>
+                                  <MenuItem value="=">Égal à</MenuItem>
+                                </Select>
+                              </TableCell>
+                              <TableCell>
+                                <TextField
+                                  value={editTresoMotCle}
+                                  onChange={(e) => setEditTresoMotCle(e.target.value)}
+                                  onKeyDown={(e) => { if (e.key === 'Enter') saveEditTreso(); if (e.key === 'Escape') cancelEditTreso(); }}
+                                  size="small"
+                                  autoFocus
+                                  fullWidth
+                                />
+                              </TableCell>
+                              <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                                <IconButton size="small" onClick={saveEditTreso} sx={{ color: T.accent }}>
+                                  <CheckOutlined fontSize="small" />
+                                </IconButton>
+                                <IconButton size="small" onClick={cancelEditTreso} sx={{ color: T.faint }}>
+                                  <CloseOutlined fontSize="small" />
+                                </IconButton>
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            <TableRow key={row.id} hover>
+                              <TableCell>
+                                <Chip
+                                  label={tresoOpLabel(row.operateur)}
+                                  size="small"
+                                  sx={{ bgcolor: T.accW, color: T.accent, fontWeight: 700, fontSize: '11px' }}
+                                />
+                              </TableCell>
+                              <TableCell sx={{ fontWeight: 600 }}>{row.mot_cle}</TableCell>
+                              <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                                <IconButton size="small" onClick={() => startEditTreso(row)} sx={{ color: T.muted }}>
+                                  <EditOutlined fontSize="small" />
+                                </IconButton>
+                                <IconButton size="small" onClick={() => handleDeleteTreso(row.id)} sx={{ color: T.neg }}>
+                                  <DeleteOutline fontSize="small" />
+                                </IconButton>
+                              </TableCell>
+                            </TableRow>
+                          )
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Paper>
             </Box>
           )}
 

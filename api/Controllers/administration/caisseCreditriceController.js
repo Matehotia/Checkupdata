@@ -94,26 +94,123 @@ exports.getCaisseCreditrice = async (req, res) => {
   }
 };
 
-// Stats pour le dashboard : nombre de lignes où la caisse a été créditrice.
+// Stats pour le dashboard : nombre d'anomalies ENREGISTRÉES (table), pas de recalcul.
 exports.getStats = async (req, res) => {
   try {
     const { id_compte, id_dossier, id_exercice } = req.params;
-    const { date_debut, date_fin } = req.query;
+    const { id_periode } = req.query;
 
-    const { nbComptes, nbNegatives } = await computeCaisse(id_compte, id_dossier, id_exercice, date_debut, date_fin);
+    const scope = {
+      id_compte: parseInt(id_compte, 10),
+      id_dossier: parseInt(id_dossier, 10),
+      id_exercice: parseInt(id_exercice, 10),
+      id_periode: (id_periode !== undefined && id_periode !== '') ? parseInt(id_periode, 10) : null,
+    };
+
+    const nb = await db.caisseCreditriceAnomalies.count({ where: scope });
 
     return res.json({
       state: true,
       data: {
-        total_anomalies: nbNegatives,
-        total: nbNegatives,
-        restantes: nbNegatives,
-        nonValide: nbNegatives,
-        nbComptes,
+        total_anomalies: nb,
+        total: nb,
+        restantes: nb,
+        nonValide: nb,
       },
     });
   } catch (error) {
     console.error('[CAISSE_CREDITRICE] stats error:', error);
     return res.status(500).json({ state: false, msg: 'Erreur serveur', error: error.message });
+  }
+};
+
+// Lit les anomalies enregistrées (table).
+exports.getStored = async (req, res) => {
+  try {
+    const { id_compte, id_dossier, id_exercice } = req.params;
+    const { id_periode } = req.query;
+
+    const scope = {
+      id_compte: parseInt(id_compte, 10),
+      id_dossier: parseInt(id_dossier, 10),
+      id_exercice: parseInt(id_exercice, 10),
+      id_periode: (id_periode !== undefined && id_periode !== '') ? parseInt(id_periode, 10) : null,
+    };
+
+    const rows = await db.caisseCreditriceAnomalies.findAll({
+      where: scope,
+      order: [['compte', 'ASC'], ['dateecriture', 'ASC'], ['id_journal', 'ASC']],
+    });
+
+    const lignes = rows.map((r) => ({
+      id: r.id_journal,
+      id_ecriture: r.id_ecriture,
+      dateecriture: r.dateecriture,
+      comptegen: r.comptegen,
+      compte: r.compte,
+      piece: r.piece,
+      libelle: r.libelle,
+      debit: Number(r.debit) || 0,
+      credit: Number(r.credit) || 0,
+      solde_cumule: Number(r.solde_cumule) || 0,
+    }));
+
+    const comptes = [...new Set(lignes.map((l) => l.compte))];
+    return res.json({
+      state: true,
+      data: { lignes, nbComptes: comptes.length, nbNegatives: lignes.length },
+      count: lignes.length,
+    });
+  } catch (error) {
+    console.error('[CAISSE_CREDITRICE] stored error:', error);
+    return res.status(500).json({ state: false, message: 'Erreur serveur', error: error.message });
+  }
+};
+
+// Réviser = recalcule + enregistre (remplace le périmètre).
+exports.saveCaisse = async (req, res) => {
+  try {
+    const { id_compte, id_dossier, id_exercice } = req.params;
+    const { date_debut, date_fin, id_periode } = req.query;
+
+    if (!id_compte || !id_dossier || !id_exercice) {
+      return res.status(400).json({ state: false, message: 'Paramètres manquants' });
+    }
+
+    const { lignes } = await computeCaisse(id_compte, id_dossier, id_exercice, date_debut, date_fin);
+
+    const scope = {
+      id_compte: parseInt(id_compte, 10),
+      id_dossier: parseInt(id_dossier, 10),
+      id_exercice: parseInt(id_exercice, 10),
+      id_periode: (id_periode !== undefined && id_periode !== '') ? parseInt(id_periode, 10) : null,
+    };
+
+    await db.sequelize.transaction(async (t) => {
+      await db.caisseCreditriceAnomalies.destroy({ where: scope, transaction: t });
+      if (lignes.length > 0) {
+        await db.caisseCreditriceAnomalies.bulkCreate(
+          lignes.map((l) => ({
+            ...scope,
+            id_journal: l.id,
+            id_ecriture: l.id_ecriture,
+            compte: l.compte,
+            comptegen: l.comptegen,
+            piece: l.piece,
+            libelle: l.libelle,
+            dateecriture: l.dateecriture,
+            debit: l.debit,
+            credit: l.credit,
+            solde_cumule: l.solde_cumule,
+          })),
+          { transaction: t }
+        );
+      }
+    });
+
+    return res.json({ state: true, saved: lignes.length });
+  } catch (error) {
+    console.error('[CAISSE_CREDITRICE] save error:', error);
+    return res.status(500).json({ state: false, message: 'Erreur serveur', error: error.message });
   }
 };

@@ -5,10 +5,16 @@ const verifyJWT = require('../../Middlewares/verifyJWT');
 
 router.use(verifyJWT);
 
-// Données détaillées (global + écritures déséquilibrées)
+// Données détaillées calculées en live (global + écritures déséquilibrées)
 router.get('/:id_compte/:id_dossier/:id_exercice', equilibreDebitCreditController.getEquilibre);
 
-// Stats (dashboard)
+// Stats (dashboard) — depuis la table
 router.get('/:id_compte/:id_dossier/:id_exercice/stats', equilibreDebitCreditController.getStats);
+
+// Lecture des anomalies enregistrées (table)
+router.get('/stored/:id_compte/:id_dossier/:id_exercice', equilibreDebitCreditController.getStored);
+
+// Réviser = recalcule + enregistre
+router.post('/save/:id_compte/:id_dossier/:id_exercice', equilibreDebitCreditController.saveEquilibre);
 
 module.exports = router;

@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  Box, Typography, Stack, Chip, CircularProgress, Alert, Select, MenuItem,
+  Box, Typography, Stack, Chip, CircularProgress, Alert, Button, Select, MenuItem,
   Table, TableHead, TableBody, TableRow, TableCell, TableContainer,
 } from '@mui/material';
-import { CheckCircleOutline, WarningAmberOutlined } from '@mui/icons-material';
+import { CheckCircleOutline, WarningAmberOutlined, RestartAltOutlined } from '@mui/icons-material';
+import toast from 'react-hot-toast';
 import useAxiosPrivate from '../../hooks/useAxiosPrivate';
 import useAuth from '../../hooks/useAuth';
 import { useExercicePeriode } from '../../context/ExercicePeriodeContext';
@@ -54,27 +55,50 @@ const EquilibreDebitCredit = ({ id_exercice, id_periode }) => {
   }), [auth]);
 
   const [loading, setLoading] = useState(false);
+  const [revising, setRevising] = useState(false);
   const [data, setData] = useState(null);
   const [selectedEcriture, setSelectedEcriture] = useState('');
 
-  const fetchData = useCallback(async () => {
+  // Lecture des anomalies enregistrées (pas de recalcul)
+  const fetchStored = useCallback(async () => {
     if (!effectiveExerciceId) return;
     setLoading(true);
     try {
-      let url = `/administration/equilibreDebitCredit/${ids.id_compte}/${ids.id_dossier}/${effectiveExerciceId}`;
-      if (selectedPeriodeDates?.date_debut && selectedPeriodeDates?.date_fin) {
-        url += `?date_debut=${selectedPeriodeDates.date_debut}&date_fin=${selectedPeriodeDates.date_fin}`;
-      }
+      let url = `/administration/equilibreDebitCredit/stored/${ids.id_compte}/${ids.id_dossier}/${effectiveExerciceId}`;
+      if (effectivePeriodeId) url += `?id_periode=${effectivePeriodeId}`;
       const res = await axiosPrivate.get(url);
       if (res.data?.state) setData(res.data.data);
     } catch (e) {
-      console.error('Erreur équilibre débit/crédit:', e);
+      console.error('Erreur lecture équilibre débit/crédit:', e);
     } finally {
       setLoading(false);
     }
-  }, [axiosPrivate, ids, effectiveExerciceId, effectivePeriodeId, selectedPeriodeDates]);
+  }, [axiosPrivate, ids, effectiveExerciceId, effectivePeriodeId]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  // Réviser = recalcule + enregistre + rafraîchit
+  const handleReviser = async () => {
+    if (!effectiveExerciceId) return;
+    setRevising(true);
+    try {
+      const qs = [];
+      if (selectedPeriodeDates?.date_debut && selectedPeriodeDates?.date_fin) {
+        qs.push(`date_debut=${selectedPeriodeDates.date_debut}`, `date_fin=${selectedPeriodeDates.date_fin}`);
+      }
+      if (effectivePeriodeId) qs.push(`id_periode=${effectivePeriodeId}`);
+      const url = `/administration/equilibreDebitCredit/save/${ids.id_compte}/${ids.id_dossier}/${effectiveExerciceId}${qs.length ? `?${qs.join('&')}` : ''}`;
+      const res = await axiosPrivate.post(url);
+      const n = res.data?.saved ?? 0;
+      await fetchStored();
+      toast.success(`Contrôle terminé : ${n} écriture${n > 1 ? 's' : ''} déséquilibrée(s)`);
+    } catch (e) {
+      console.error('Erreur révision équilibre:', e);
+      toast.error('Erreur lors de la révision');
+    } finally {
+      setRevising(false);
+    }
+  };
+
+  useEffect(() => { fetchStored(); }, [fetchStored]);
 
   // Réinitialise le filtre écriture à chaque nouveau chargement.
   useEffect(() => { setSelectedEcriture(''); }, [data]);
@@ -118,7 +142,7 @@ const EquilibreDebitCredit = ({ id_exercice, id_periode }) => {
           <StatCell label="Total débit" value={fmt(g.total_debit)} />
           <StatCell label="Total crédit" value={fmt(g.total_credit)} />
           <StatCell label="Écart global" value={fmt(g.ecart)} color={g.equilibre ? T.pos : T.neg} />
-          <Box sx={{ flex: 1, minWidth: 0, p: { xs: 2, md: 2.5 }, display: 'flex', alignItems: 'center' }}>
+          <Box sx={{ flex: 1, minWidth: 0, p: { xs: 2, md: 2.5 }, display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
             <Chip
               icon={g.equilibre ? <CheckCircleOutline sx={{ fontSize: 18 }} /> : <WarningAmberOutlined sx={{ fontSize: 18 }} />}
               label={g.equilibre ? 'Équilibré' : 'Déséquilibré'}
@@ -129,6 +153,16 @@ const EquilibreDebitCredit = ({ id_exercice, id_periode }) => {
                 '& .MuiChip-icon': { color: 'inherit' },
               }}
             />
+            <Button
+              variant="contained"
+              disableElevation
+              startIcon={revising ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <RestartAltOutlined />}
+              onClick={handleReviser}
+              disabled={revising}
+              sx={{ ml: 'auto', bgcolor: T.accent, textTransform: 'none', fontWeight: 700, '&:hover': { bgcolor: '#0B6870' } }}
+            >
+              {revising ? 'Révision…' : 'Réviser'}
+            </Button>
           </Box>
         </Stack>
       </Box>
@@ -165,7 +199,11 @@ const EquilibreDebitCredit = ({ id_exercice, id_periode }) => {
         )} */}
       </Stack>
 
-      {ecritures.length === 0 ? (
+      {!data?.revised ? (
+        <Alert severity="info" icon={<RestartAltOutlined />} sx={{ borderRadius: '12px' }}>
+          Aucune donnée enregistrée. Cliquez sur « Réviser » pour lancer le contrôle.
+        </Alert>
+      ) : ecritures.length === 0 ? (
         <Alert severity="success" icon={<CheckCircleOutline />} sx={{ borderRadius: '12px' }}>
           Toutes les écritures sont équilibrées (débit = crédit), y compris au niveau global.
         </Alert>

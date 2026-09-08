@@ -32,6 +32,8 @@ import ControleAnalytique from './listecontroles/controleAnalytique';
 import EquilibreDebitCredit from './listecontroles/EquilibreDebitCredit';
 import CaisseCreditrice from './listecontroles/CaisseCreditrice';
 import CoherenceHtTva from './listecontroles/CoherenceHtTva';
+import TauxTva from './listecontroles/TauxTva';
+import SequenceCheque from './listecontroles/SequenceCheque';
 import ExercicePeriodeSelector from './ExercicePeriodeSelector';
 
 // ─── Système de design (aligné sur ExportBalance / le tableau de bord) ───
@@ -103,7 +105,7 @@ const CONTROL_GROUPS = [
       {
         cycle: 'Trésorerie',
         items: [
-          { id: 'sequenceCheques', label: 'Séquence des numéros de chèque', icon: PH, placeholder: true },
+          { id: 'sequenceCheques', label: 'Séquence des numéros de chèque', icon: <ReceiptLongOutlined sx={{ fontSize: 20 }} /> },
           { id: 'caisseCreditrice', label: 'Caisse créditrice (solde 53 négatif — impossible physiquement)', icon: <PointOfSaleOutlined sx={{ fontSize: 20 }} /> },
           { id: 'banqueNonPointee', label: 'Écritures de banque non pointées / rapprochement bancaire', icon: PH, placeholder: true },
           { id: 'virementsInternes', label: 'Virements internes (compte 58) non soldés', icon: PH, placeholder: true },
@@ -126,7 +128,7 @@ const CONTROL_GROUPS = [
     items: [
       { id: 'utilCptTva', label: 'Utilisation des comptes de TVA', icon: <ReceiptLongOutlined sx={{ fontSize: 20 }} />, revisionType: 'UTIL_CPT_TVA' },
       { id: 'tvaNonDeductible', label: 'TVA non déductible', icon: PH, placeholder: true },
-      { id: 'tauxTva', label: 'Contrôle des taux de TVA', icon: PH, placeholder: true },
+      { id: 'tauxTva', label: 'Contrôle des taux de TVA', icon: <ReceiptLongOutlined sx={{ fontSize: 20 }} /> },
       { id: 'concordanceTva', label: 'Concordance TVA collectée (4457) / base ventes, et TVA déductible (4456) / base achats', icon: PH, placeholder: true },
       { id: 'tvaSansBase', label: 'Compte de TVA mouvementé sans base HT correspondante (et inversement)', icon: PH, placeholder: true },
       { id: 'concordanceCa3', label: 'Concordance comptabilité / déclarations CA3', icon: PH, placeholder: true },
@@ -523,6 +525,18 @@ const DetailsControles = () => {
             )}
             {activeControl === 'coherenceHtTva' && (
               <CoherenceHtTva
+                id_exercice={selectedExerciceId}
+                id_periode={selectedPeriodeId}
+              />
+            )}
+            {activeControl === 'tauxTva' && (
+              <TauxTva
+                id_exercice={selectedExerciceId}
+                id_periode={selectedPeriodeId}
+              />
+            )}
+            {activeControl === 'sequenceCheques' && (
+              <SequenceCheque
                 id_exercice={selectedExerciceId}
                 id_periode={selectedPeriodeId}
               />
