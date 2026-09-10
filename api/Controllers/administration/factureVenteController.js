@@ -89,7 +89,6 @@ const computeFactureVente = async (id_compte, id_dossier, id_exercice, date_debu
 };
 
 // Calcule l'écart de séquence + le flag anomalie par ligne.
-//anomalie si écart != 1.
 const withSequenceFlags = (lignes) => {
   const toNum = (s) => {
     const n = parseInt(String(s || '').replace(/\D/g, ''), 10);
