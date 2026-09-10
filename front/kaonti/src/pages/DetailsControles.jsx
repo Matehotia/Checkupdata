@@ -34,6 +34,7 @@ import CaisseCreditrice from './listecontroles/CaisseCreditrice';
 import CoherenceHtTva from './listecontroles/CoherenceHtTva';
 import TauxTva from './listecontroles/TauxTva';
 import SequenceCheque from './listecontroles/SequenceCheque';
+import FactureVente from './listecontroles/FactureVente';
 import ExercicePeriodeSelector from './ExercicePeriodeSelector';
 
 // ─── Système de design (aligné sur ExportBalance / le tableau de bord) ───
@@ -116,7 +117,7 @@ const CONTROL_GROUPS = [
         items: [
           { id: 'sensEcriture', label: "Sens d'enregistrement des factures d'achats et de ventes", icon: <SwapVertOutlined sx={{ fontSize: 20 }} />, revisionType: 'SENS_ECRITURE' },
           { id: 'tiers', label: 'Analyse Fournisseurs / Clients', icon: <PeopleAltOutlined sx={{ fontSize: 20 }} /> },
-          { id: 'soldesInverses', label: 'Fournisseur débiteur / Client créditeur (soldes inversés)', icon: PH, placeholder: true },
+          { id: 'numeroFactureVente', label: 'Contrôle numéro facture de vente', icon: <ReceiptLongOutlined sx={{ fontSize: 20 }} /> },
           { id: 'coherenceHtTva', label: 'Cohérence HT / TVA / TTC sur les factures', icon: <RequestQuoteOutlined sx={{ fontSize: 20 }} /> },
           { id: 'balanceAgee', label: 'Balance âgée : antériorité des tiers non lettrés', icon: PH, placeholder: true },
         ],
@@ -537,6 +538,12 @@ const DetailsControles = () => {
             )}
             {activeControl === 'sequenceCheques' && (
               <SequenceCheque
+                id_exercice={selectedExerciceId}
+                id_periode={selectedPeriodeId}
+              />
+            )}
+            {activeControl === 'numeroFactureVente' && (
+              <FactureVente
                 id_exercice={selectedExerciceId}
                 id_periode={selectedPeriodeId}
               />

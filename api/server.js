@@ -89,6 +89,9 @@ app.use('/paramTauxTva', require('./Routes/parametres/tauxTvaParamRoute'));
 // Paramétrage Trésorerie (règles opérateur + mot-clé) par dossier
 app.use('/paramTresorerie', require('./Routes/parametres/parametrageTresorerieRoute'));
 
+// Paramétrage Vente (format du numéro de facture) par dossier
+app.use('/paramVente', require('./Routes/parametres/parametrageVenteRoute'));
+
 // Codes Journaux
 app.use('/param/codejournals', require('./Routes/parametres/codejournalsRoute'));
 app.use('/paramCodeJournaux', require('./Routes/parametres/codejournalsRoute')); // alias
@@ -161,6 +164,9 @@ app.use('/administration/coherenceHtTva', require('./Routes/Administration/coher
 
 // Route pour le contrôle Séquence des numéros de chèque (journaux BANQUE + règles Trésorerie)
 app.use('/administration/sequenceCheque', require('./Routes/Administration/sequenceChequeRoutes'));
+
+// Route pour le contrôle Numéro facture de vente (journaux VENTE, comptes 70x, formats Vente)
+app.use('/administration/factureVente', require('./Routes/Administration/factureVenteRoutes'));
 
 // Route pour le contrôle Taux de TVA (copie de cohérence, affichage centré sur le taux)
 app.use('/administration/tauxTva', require('./Routes/Administration/tauxTvaRoutes'));

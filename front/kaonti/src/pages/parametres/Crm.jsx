@@ -5,7 +5,7 @@ import {
   TextField, Chip, Breadcrumbs, Link, MenuItem,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   List, ListItemButton, ListItemText, ListItemIcon, Select,
-  Autocomplete,
+  Autocomplete, Checkbox, FormControlLabel,
 
 } from '@mui/material';
 import {
@@ -13,7 +13,7 @@ import {
   AddOutlined, EditOutlined, DeleteOutline, SaveOutlined,
   AnalyticsOutlined, MenuBookOutlined, AccountTreeOutlined,
   ListAltOutlined, AdminPanelSettingsOutlined, CheckOutlined, CloseOutlined,
-  DashboardOutlined, PercentOutlined, AccountBalanceOutlined,
+  DashboardOutlined, PercentOutlined, AccountBalanceOutlined, SellOutlined,
 
 } from '@mui/icons-material';
 import AccessTimeOutlined from '@mui/icons-material/AccessTimeOutlined';
@@ -2117,6 +2117,17 @@ const CRM = () => {
   const [editTresoId, setEditTresoId] = useState(null);
   const [editTresoOperateur, setEditTresoOperateur] = useState('cont');
   const [editTresoMotCle, setEditTresoMotCle] = useState('');
+
+  // --- Vente (formats de numéro de facture) ---
+  const [venteList, setVenteList] = useState([]);
+  const [venteLoading, setVenteLoading] = useState(false);
+  const [newVentePrefixe, setNewVentePrefixe] = useState('');
+  const [newVenteLongueur, setNewVenteLongueur] = useState('');
+  const [newVenteRetirer, setNewVenteRetirer] = useState(false);
+  const [editVenteId, setEditVenteId] = useState(null);
+  const [editVentePrefixe, setEditVentePrefixe] = useState('');
+  const [editVenteLongueur, setEditVenteLongueur] = useState('');
+  const [editVenteRetirer, setEditVenteRetirer] = useState(false);
   const [crmData, setCrmData] = useState(null);
 
   const formikNewJournal = useFormik({
@@ -2486,6 +2497,83 @@ const CRM = () => {
 
   const tresoOpLabel = (op) => (op === 'com_par' ? 'Commence par' : op === '=' ? 'Égal à' : 'Contient');
 
+  // --- Vente (formats de numéro de facture) ---
+  const fetchVente = async () => {
+    if (!fileId || fileId === '0' || !compteId) return;
+    setVenteLoading(true);
+    try {
+      const res = await axiosPrivate.get(`/paramVente/${compteId}/${fileId}`);
+      if (res.data?.state) setVenteList(res.data.data || []);
+    } catch (e) {
+      console.error('Erreur chargement Vente', e);
+    } finally {
+      setVenteLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 8) fetchVente();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, fileId]);
+
+  const handleAddVente = async () => {
+    if (!newVentePrefixe.trim()) { toast.error('Le préfixe est requis'); return; }
+    try {
+      await axiosPrivate.post('/paramVente', {
+        id_compte: compteId, id_dossier: fileId,
+        prefixe_facture: newVentePrefixe.trim(),
+        longueur_facture: newVenteLongueur === '' ? null : newVenteLongueur,
+        retirer_lettres: newVenteRetirer,
+      });
+      setNewVentePrefixe('');
+      setNewVenteLongueur('');
+      setNewVenteRetirer(false);
+      await fetchVente();
+      toast.success('Format ajouté');
+    } catch (e) {
+      toast.error('Erreur lors de l\'ajout');
+    }
+  };
+
+  const handleDeleteVente = async (id) => {
+    try {
+      await axiosPrivate.delete(`/paramVente/${id}`);
+      await fetchVente();
+      toast.success('Format supprimé');
+    } catch (e) {
+      toast.error('Erreur lors de la suppression');
+    }
+  };
+
+  const startEditVente = (row) => {
+    setEditVenteId(row.id);
+    setEditVentePrefixe(row.prefixe_facture || '');
+    setEditVenteLongueur(row.longueur_facture != null ? String(row.longueur_facture) : '');
+    setEditVenteRetirer(!!row.retirer_lettres);
+  };
+
+  const cancelEditVente = () => {
+    setEditVenteId(null);
+    setEditVentePrefixe('');
+    setEditVenteLongueur('');
+    setEditVenteRetirer(false);
+  };
+
+  const saveEditVente = async () => {
+    try {
+      await axiosPrivate.put(`/paramVente/${editVenteId}`, {
+        prefixe_facture: editVentePrefixe.trim(),
+        longueur_facture: editVenteLongueur === '' ? null : editVenteLongueur,
+        retirer_lettres: editVenteRetirer,
+      });
+      cancelEditVente();
+      await fetchVente();
+      toast.success('Format modifié');
+    } catch (e) {
+      toast.error('Erreur lors de la modification');
+    }
+  };
+
   // Style Header Tableau (Pro & Minimaliste)
   const headerStyle = {
     fontWeight: 800,
@@ -2639,6 +2727,7 @@ const CRM = () => {
               { value: 0, label: 'Seuils', icon: <SettingsOutlined /> },
               { value: 6, label: 'Taux TVA', icon: <PercentOutlined /> },
               { value: 7, label: 'Trésorerie', icon: <AccountBalanceOutlined /> },
+              { value: 8, label: 'Vente', icon: <SellOutlined /> },
             ].map((s) => {
               const active = activeTab === s.value;
               return (
@@ -2990,6 +3079,114 @@ const CRM = () => {
                                 <IconButton size="small" onClick={() => handleDeleteTreso(row.id)} sx={{ color: T.neg }}>
                                   <DeleteOutline fontSize="small" />
                                 </IconButton>
+                              </TableCell>
+                            </TableRow>
+                          )
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Paper>
+            </Box>
+          )}
+
+          {/* VENTE */}
+          {activeTab === 8 && (
+            <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+              <Paper elevation={0} sx={{ ...panelSx, p: 3 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <SellOutlined sx={{ color: T.accent }} /> Vente — numéro de facture
+                </Typography>
+
+                {/* Formulaire d'ajout */}
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'flex-end' }} sx={{ mb: 3 }}>
+                  <Box sx={{ flex: 1, minWidth: 160 }}>
+                    <FieldLabel>Préfixe numéro de facture</FieldLabel>
+                    <TextField
+                      value={newVentePrefixe}
+                      onChange={(e) => setNewVentePrefixe(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleAddVente(); }}
+                      size="small"
+                      placeholder="ex. FV"
+                      fullWidth
+                    />
+                  </Box>
+                  <Box sx={{ minWidth: 160 }}>
+                    <FieldLabel>Longueur (optionnel)</FieldLabel>
+                    <TextField
+                      value={newVenteLongueur}
+                      onChange={(e) => setNewVenteLongueur(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleAddVente(); }}
+                      type="number"
+                      size="small"
+                      placeholder="vide = toutes"
+                      fullWidth
+                    />
+                  </Box>
+                  <FormControlLabel
+                    sx={{ mb: 0.5, whiteSpace: 'nowrap' }}
+                    control={<Checkbox size="small" checked={newVenteRetirer} onChange={(e) => setNewVenteRetirer(e.target.checked)} sx={{ color: T.faint, '&.Mui-checked': { color: T.accent } }} />}
+                    label={<Typography sx={{ fontSize: '13px', fontWeight: 600 }}>Retirer les lettres</Typography>}
+                  />
+                  <Button
+                    variant="contained"
+                    disableElevation
+                    startIcon={<AddOutlined />}
+                    sx={{ ...primaryBtnSx, height: '40px' }}
+                    onClick={handleAddVente}
+                  >
+                    Ajouter
+                  </Button>
+                </Stack>
+
+                {/* Liste des formats */}
+                <TableContainer sx={{ border: `1px solid ${T.line}`, borderRadius: '12px' }}>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow sx={{ '& th': { bgcolor: '#F8FAFC', color: '#64748B', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.4px' } }}>
+                        <TableCell>Préfixe</TableCell>
+                        <TableCell>Longueur</TableCell>
+                        <TableCell align="center">Retirer lettres</TableCell>
+                        <TableCell align="right" sx={{ width: 90 }}>Action</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {venteList.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={4} sx={{ textAlign: 'center', color: T.faint, py: 3 }}>
+                            {venteLoading ? 'Chargement…' : 'Aucun format paramétré'}
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        venteList.map((row) => (
+                          editVenteId === row.id ? (
+                            <TableRow key={row.id}>
+                              <TableCell>
+                                <TextField value={editVentePrefixe} onChange={(e) => setEditVentePrefixe(e.target.value)} size="small" sx={{ minWidth: 120 }} autoFocus />
+                              </TableCell>
+                              <TableCell>
+                                <TextField value={editVenteLongueur} onChange={(e) => setEditVenteLongueur(e.target.value)} type="number" size="small" sx={{ width: 100 }}
+                                  onKeyDown={(e) => { if (e.key === 'Enter') saveEditVente(); if (e.key === 'Escape') cancelEditVente(); }} />
+                              </TableCell>
+                              <TableCell align="center">
+                                <Checkbox size="small" checked={editVenteRetirer} onChange={(e) => setEditVenteRetirer(e.target.checked)} sx={{ color: T.faint, '&.Mui-checked': { color: T.accent } }} />
+                              </TableCell>
+                              <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                                <IconButton size="small" onClick={saveEditVente} sx={{ color: T.accent }}><CheckOutlined fontSize="small" /></IconButton>
+                                <IconButton size="small" onClick={cancelEditVente} sx={{ color: T.faint }}><CloseOutlined fontSize="small" /></IconButton>
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            <TableRow key={row.id} hover>
+                              <TableCell sx={{ fontWeight: 700 }}>{row.prefixe_facture || '—'}</TableCell>
+                              <TableCell>{row.longueur_facture != null ? row.longueur_facture : '—'}</TableCell>
+                              <TableCell align="center">
+                                <Chip label={row.retirer_lettres ? 'Oui' : 'Non'} size="small" sx={{ bgcolor: row.retirer_lettres ? T.accW : '#F1F5F9', color: row.retirer_lettres ? T.accent : T.muted, fontWeight: 700, fontSize: '11px' }} />
+                              </TableCell>
+                              <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                                <IconButton size="small" onClick={() => startEditVente(row)} sx={{ color: T.muted }}><EditOutlined fontSize="small" /></IconButton>
+                                <IconButton size="small" onClick={() => handleDeleteVente(row.id)} sx={{ color: T.neg }}><DeleteOutline fontSize="small" /></IconButton>
                               </TableCell>
                             </TableRow>
                           )
