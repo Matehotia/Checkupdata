@@ -77,7 +77,7 @@ app.use('/sous-compte', require('./Routes/User/SousComptes/sousCompteRoutes'));
 //--------------------------------------------------------------------------------------------------------
 //MENU PARAMETRES
 //-------------------------------------------------------------------------------------------------------------
-// app.use('/api/exercices', require('./Routes/parametres/exerciceRoute'));
+app.use('/api/exercices', require('./Routes/parametres/exerciceRoute')); // utilisé par l'écran d'import journal
 app.use('/paramExercice', require('./Routes/parametres/exerciceRoute')); // alias
 // app.use('/api/grille-tarifaire', require('./Routes/parametres/grilleTarifaireRoute'));
 
@@ -170,6 +170,9 @@ app.use('/administration/factureVente', require('./Routes/Administration/facture
 
 // Route pour le contrôle Taux de TVA (copie de cohérence, affichage centré sur le taux)
 app.use('/administration/tauxTva', require('./Routes/Administration/tauxTvaRoutes'));
+
+// Route pour le contrôle Revue analytique N/N-1 (contenu attendu compte par compte : OD paie 42/43, etc.)
+app.use('/administration/revueAnalytiqueNN1', require('./Routes/Administration/revueAnalytiqueNN1Routes'));
 
 // Routes pour la révision analytique
 app.use('/administration/revisionAnalytique', require('./Routes/Administration/revisionAnalytiqueRoute'));

@@ -31,7 +31,9 @@ import {
   TableHead,
   TableRow,
   TablePagination,
-  Collapse
+  Collapse,
+  CircularProgress,
+  Tooltip
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 
@@ -42,11 +44,12 @@ import {
   ShortTextOutlined,
   PaymentsOutlined,
   EventOutlined,
-  Search, ChevronLeft,
+  Search, ChevronLeft, RestartAltOutlined,
   ChevronRight,
   Visibility,
   CheckCircle, CopyAllOutlined,
-  WarningAmber, DeleteOutline, DoneAll, CalendarToday, Timer, FilterList
+  WarningAmber, DeleteOutline, DoneAll, CalendarToday, Timer, FilterList,
+  TaskAltRounded, RadioButtonUnchecked
 } from '@mui/icons-material';
 import { init } from '../../../init';
 import axios from '../../../config/axios';
@@ -537,7 +540,7 @@ const RechercheDoublons = forwardRef(({ id_exercice, id_periode }, ref) => {
     },
     {
       field: 'statut',
-      headerName: 'STATUT',
+      headerName: 'ANOMALIE',
       width: 90,
       align: 'center',
       headerAlign: 'center',
@@ -558,24 +561,25 @@ const RechercheDoublons = forwardRef(({ id_exercice, id_periode }, ref) => {
       renderCell: (params) => (
         params.row.statut === 'VALIDE'
           ? (
-            <Chip
-              label="VALIDÉ"
-              size="small"
-              color="success"
-              sx={{ fontWeight: 900, fontSize: '0.7rem' }}
-            />
+            <Tooltip title="Validé" arrow>
+              <TaskAltRounded sx={{ color: '#1F8A70', fontSize: '1.25rem' }} />
+            </Tooltip>
           )
           : (
-            <Button
-              variant="outlined"
-              size="small"
-              color="success"
-              onClick={() => handleRequestValidateGroup(params.row.id_doublon)}
-              disabled={validatingGroup === params.row.id_doublon}
-              sx={{ textTransform: 'none', fontWeight: 700, borderRadius: '6px', fontSize: '0.75rem' }}
-            >
-              {validatingGroup === params.row.id_doublon ? 'Validation...' : 'Valider'}
-            </Button>
+            <Tooltip title="Valider" arrow>
+              <span>
+                <IconButton
+                  size="small"
+                  onClick={() => handleRequestValidateGroup(params.row.id_doublon)}
+                  disabled={validatingGroup === params.row.id_doublon}
+                  sx={{ p: 0.25, color: '#B5791A', transition: '.15s', '&:hover': { transform: 'scale(1.12)' } }}
+                >
+                  {validatingGroup === params.row.id_doublon
+                    ? <CircularProgress size={18} sx={{ color: '#B5791A' }} />
+                    : <RadioButtonUnchecked fontSize="small" />}
+                </IconButton>
+              </span>
+            </Tooltip>
           )
       )
     }
@@ -649,15 +653,36 @@ const RechercheDoublons = forwardRef(({ id_exercice, id_periode }, ref) => {
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', overflow: 'hidden', bgcolor: T.canvas }}>
 
       {/* --- STATISTIQUES GLOBALES --- */}
-      <Stack direction="row" spacing={3} sx={{ px: 2.5, py: 1.5, bgcolor: T.surface, borderBottom: `1px solid ${T.line}` }}>
-        <Box>
-          <Typography sx={statLabelSx}>Doublons détectés</Typography>
-          <Stack direction="row" spacing={0.75} alignItems="center">
-            <Typography sx={{ ...NUM, color: totalDoublonsGroupes > 0 ? T.neg : T.pos, fontWeight: 800, fontSize: '20px', lineHeight: 1 }}>{totalDoublonsGroupes}</Typography>
-            <CopyAllOutlined sx={{ color: totalDoublonsGroupes > 0 ? T.neg : T.pos, fontSize: 18 }} />
-          </Stack>
-        </Box>
-      </Stack>
+      <Box sx={{ border: `1px solid ${T.line}`, borderRadius: '14px', overflow: 'hidden', mx: 2, mt: 2, mb: 1.5, bgcolor: T.surface, flexShrink: 0 }}>
+        <Stack direction="row" divider={<Box sx={{ width: '1px', bgcolor: T.line }} />} flexWrap="wrap" alignItems="center">
+          <Box sx={{ flex: 1, minWidth: 0, p: { xs: 2, md: 2.5 } }}>
+            <Typography sx={{ fontSize: '11px', fontWeight: 700, color: T.muted, textTransform: 'uppercase', letterSpacing: '.4px', mb: 0.75 }}>Doublons détectés</Typography>
+            <Typography sx={{ ...NUM, fontSize: { xs: '20px', md: '24px' }, fontWeight: 800, letterSpacing: '-.4px', lineHeight: 1, color: totalDoublonsGroupes > 0 ? T.neg : T.pos }}>{totalDoublonsGroupes}</Typography>
+          </Box>
+          <Box sx={{ flex: 2, minWidth: 0, p: { xs: 2, md: 2.5 }, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+            <Button
+              variant="contained"
+              disableElevation
+              startIcon={loading ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <RestartAltOutlined />}
+              onClick={handleOpenConfirmDialog}
+              disabled={!effectiveExerciceId || loading}
+              sx={{
+                height: 34,
+                bgcolor: T.accent,
+                color: 'white',
+                textTransform: 'none',
+                fontWeight: 700,
+                px: 3,
+                borderRadius: '10px',
+                boxShadow: 'none',
+                '&:hover': { bgcolor: T.accentDark, boxShadow: 'none' },
+              }}
+            >
+              {loading ? 'Recherche...' : 'Rechercher'}
+            </Button>
+          </Box>
+        </Stack>
+      </Box>
 
       <Box sx={{ p: 2, flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 2, minHeight: 0, overflow: 'hidden' }}>
 
@@ -722,28 +747,6 @@ const RechercheDoublons = forwardRef(({ id_exercice, id_periode }, ref) => {
             >
               Tout sélectionner
             </Typography>
-
-            <Divider orientation="vertical" flexItem sx={{ mx: 1, height: 20, alignSelf: 'center', borderColor: T.line }} />
-
-            <Button
-              variant="contained"
-              startIcon={<Search />}
-              onClick={handleOpenConfirmDialog}
-              disabled={!effectiveExerciceId || loading}
-              sx={{
-                textTransform: 'none',
-                outline: 'none',
-                bgcolor: T.accent,
-                color: 'white',
-                height: '34px',
-                fontWeight: 700,
-                borderRadius: '10px',
-                boxShadow: 'none',
-                '&:hover': { bgcolor: T.accentDark, boxShadow: 'none' },
-              }}
-            >
-              {loading ? 'Recherche...' : 'Rechercher'}
-            </Button>
           </Stack>
         </Paper>
 
@@ -785,7 +788,7 @@ const RechercheDoublons = forwardRef(({ id_exercice, id_periode }, ref) => {
                     <TableCell>LIBELLÉ COMMUN</TableCell>
                     <TableCell align="right">MONTANT</TableCell>
                     <TableCell align="center">DOUBLONS</TableCell>
-                    <TableCell align="center">STATUT</TableCell>
+                    <TableCell align="center">ANOMALIE</TableCell>
                     <TableCell align="right">ACTION</TableCell>
                   </TableRow>
                 </TableHead>
@@ -824,21 +827,24 @@ const RechercheDoublons = forwardRef(({ id_exercice, id_periode }, ref) => {
                         </TableCell>
                         <TableCell align="right">
                           {group.statut === 'VALIDE' ? (
-                            <Chip
-                              label="VALIDÉ"
-                              size="small"
-                              sx={{ fontWeight: 900, fontSize: '0.7rem', bgcolor: T.accW, color: T.pos }}
-                            />
+                            <Tooltip title="Validé" arrow>
+                              <TaskAltRounded sx={{ color: T.pos, fontSize: '1.25rem' }} />
+                            </Tooltip>
                           ) : (
-                            <Button
-                              variant="outlined"
-                              size="small"
-                              onClick={() => handleRequestValidateGroup(group.id_doublon)}
-                              disabled={validatingGroup === group.id_doublon}
-                              sx={{ textTransform: 'none', fontWeight: 700, borderRadius: '8px', fontSize: '0.75rem', color: T.accent, borderColor: T.accent, '&:hover': { borderColor: T.accentDark, bgcolor: T.accW } }}
-                            >
-                              {validatingGroup === group.id_doublon ? 'Validation...' : 'Valider'}
-                            </Button>
+                            <Tooltip title="Valider" arrow>
+                              <span>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleRequestValidateGroup(group.id_doublon)}
+                                  disabled={validatingGroup === group.id_doublon}
+                                  sx={{ p: 0.25, color: T.warn, transition: '.15s', '&:hover': { transform: 'scale(1.12)' } }}
+                                >
+                                  {validatingGroup === group.id_doublon
+                                    ? <CircularProgress size={18} sx={{ color: T.warn }} />
+                                    : <RadioButtonUnchecked fontSize="small" />}
+                                </IconButton>
+                              </span>
+                            </Tooltip>
                           )}
                         </TableCell>
                       </TableRow>

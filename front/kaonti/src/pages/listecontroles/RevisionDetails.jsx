@@ -520,10 +520,6 @@ const RevisionDetails = React.memo(function RevisionDetails({ type, controles, o
     const handleOpenBatchConfirm = (anomaliesToValidate, valide) => {
         if (!anomaliesToValidate || anomaliesToValidate.length === 0) return;
 
-        // console.log("=== BATCH CONFIRM ===");
-        // console.log("COUNT:", anomaliesToValidate.length);
-        // console.log("SAMPLE:", anomaliesToValidate[0]);
-
         setConfirmPopup({
             open: true,
             action: valide ? 'valider_tout' : 'annuler_tout',
@@ -676,8 +672,6 @@ const RevisionDetails = React.memo(function RevisionDetails({ type, controles, o
     // Valider une ligne spécifique - Ouvrir popup de confirmation
     const handleValidateLine = (line, anomalie) => {
         if (!line || !anomalie) return;
-
-        // Ouvrir popup de confirmation pour validation de ligne
         setConfirmPopup({
             open: true,
             anomalie: anomalie,
@@ -2088,13 +2082,24 @@ const RevisionDetails = React.memo(function RevisionDetails({ type, controles, o
                                                                     { field: 'commentaire', headerName: 'Commentaire', width: 120, align: 'center', headerAlign: 'center', sortable: false, renderCell: p => { const a = getAnomalyForLine(p.row); return renderCommentCell(a?.commentaire, () => handleCommentLine(p.row, a || p.row._anomalies[0]), !!a); } },
                                                                 ]}
                                                             />
-                                                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mt: 1, p: 1, backgroundColor: '#e3f2fd' }}>
-                                                                <Typography variant="caption" sx={{ fontWeight: 600 }}>Total Débit: {totalDebit.toLocaleString("fr-FR", { minimumFractionDigits: 2 }).replace(/\u00A0/g, ' ')}</Typography>
-                                                                <Typography variant="caption" sx={{ fontWeight: 600 }}>Total Crédit: {totalCredit.toLocaleString("fr-FR", { minimumFractionDigits: 2 }).replace(/\u00A0/g, ' ')}</Typography>
-                                                            </Box>
-                                                            <Box sx={{ p: 1, backgroundColor: '#fff3e0' }}>
-                                                                <Typography variant="caption" sx={{ fontWeight: 600 }}>Solde: {soldeNormalise > 0 ? `Débiteur: ${soldeNormalise.toFixed(2)}` : soldeNormalise < 0 ? `Créditeur: ${Math.abs(soldeNormalise).toFixed(2)}` : 'Solde nul'}</Typography>
-                                                            </Box>
+                                                            <Stack direction="row" alignItems="center" sx={{ mt: 1, borderTop: '2px solid #1976d2', backgroundColor: '#EEF2F7', px: 1, py: 1 }}>
+                                                                <Box sx={{ width: 120, flexShrink: 0 }} />
+                                                                <Box sx={{ width: 150, flexShrink: 0 }} />
+                                                                <Box sx={{ width: 350, flexShrink: 0, textAlign: 'right', pr: 1 }}>
+                                                                    <Typography variant="caption" sx={{ fontWeight: 800 }}>Total</Typography>
+                                                                </Box>
+                                                                <Box sx={{ width: 110, flexShrink: 0, textAlign: 'right' }}>
+                                                                    <Typography variant="caption" sx={{ fontWeight: 800 }}>{totalDebit.toLocaleString("fr-FR", { minimumFractionDigits: 2 }).replace(/\u00A0/g, ' ')}</Typography>
+                                                                </Box>
+                                                                <Box sx={{ width: 110, flexShrink: 0, textAlign: 'right' }}>
+                                                                    <Typography variant="caption" sx={{ fontWeight: 800 }}>{totalCredit.toLocaleString("fr-FR", { minimumFractionDigits: 2 }).replace(/\u00A0/g, ' ')}</Typography>
+                                                                </Box>
+                                                                <Box sx={{ width: 90 + 100 + 80 + 120, flexShrink: 0, pl: 1 }}>
+                                                                    <Typography variant="caption" sx={{ fontWeight: 800, color: soldeNormalise > 0 ? '#1565c0' : soldeNormalise < 0 ? '#e65100' : 'text.secondary' }}>
+                                                                        Solde : {soldeNormalise > 0 ? `Débiteur ${soldeNormalise.toFixed(2)}` : soldeNormalise < 0 ? `Créditeur ${Math.abs(soldeNormalise).toFixed(2)}` : 'nul'}
+                                                                    </Typography>
+                                                                </Box>
+                                                            </Stack>
                                                         </Box>
                                                     ) : (
                                                         <Typography variant="caption" color="text.secondary">

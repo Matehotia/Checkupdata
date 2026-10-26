@@ -61,6 +61,9 @@ db.coherenceHtTvaAnomalies = require('./coherenceHtTvaAnomaliesModel')(sequelize
 //anomalies enregistrées - contrôle taux de TVA (avec valider/commentaire)
 db.tauxTvaAnomalies = require('./tauxTvaAnomaliesModel')(sequelize, DataTypes);
 
+//anomalies enregistrées - contrôle revue analytique N/N-1 (OD paie 42/43, etc.)
+db.revueNN1Anomalies = require('./revueNN1AnomaliesModel')(sequelize, DataTypes);
+
 //anomalies enregistrées - contrôle caisse créditrice
 db.caisseCreditriceAnomalies = require('./caisseCreditriceAnomaliesModel')(sequelize, DataTypes);
 

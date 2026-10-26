@@ -28,7 +28,7 @@ import useAxiosPrivate from '../../hooks/useAxiosPrivate';
 import RevisionDetails from './RevisionDetails';
 import ConfirmActionDialog from '../../components/ConfirmActionDialog';
 // import PopupTestSelectedFile from '../../../componentsTools/popupTestSelectedFile';
-import { ErrorOutline, CheckCircle, KeyboardArrowDown, KeyboardArrowUp, WarningAmber, CheckCircleOutline, PictureAsPdf, TableChart, Close } from '@mui/icons-material';
+import { ErrorOutline, CheckCircle, KeyboardArrowDown, KeyboardArrowUp, WarningAmber, CheckCircleOutline, PictureAsPdf, TableChart, Close, RestartAltOutlined } from '@mui/icons-material';
 import ExercicePeriodeSelector from '../ExercicePeriodeSelector';
 import { useExercicePeriode } from '../../context/ExercicePeriodeContext';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -663,53 +663,42 @@ const Revision = forwardRef(function Revision({ id_exercice, id_periode, filterT
                 loading={confirmReviserLoading}
                 color={T.accent}
             />
-            <Stack direction="row" spacing={3} alignItems="center" sx={{ px: 2.5, py: 1.5, mb: 1.5, ...panelSx }}>
-                <Box>
-                    <Typography sx={statLabelSx}>Points critiques</Typography>
-                    <Stack direction="row" spacing={0.75} alignItems="center">
-                        <Typography sx={{ ...NUM, color: T.neg, fontWeight: 800, fontSize: '20px', lineHeight: 1 }}>
-                            {pointsCritiques}
-                        </Typography>
-                        <ErrorOutline sx={{ color: T.neg, fontSize: 18 }} />
-                    </Stack>
-                </Box>
-                <Divider orientation="vertical" flexItem sx={{ borderColor: T.line }} />
-                <Box>
-                    <Typography sx={statLabelSx}>Restants à valider</Typography>
-                    <Stack direction="row" spacing={0.75} alignItems="center">
+            <Box sx={{ border: `1px solid ${T.line}`, borderRadius: '14px', overflow: 'hidden', mb: 1.5, bgcolor: T.surface, flexShrink: 0 }}>
+                <Stack direction="row" divider={<Box sx={{ width: '1px', bgcolor: T.line }} />} flexWrap="wrap" alignItems="center">
+                    <Box sx={{ flex: 1, minWidth: 0, p: { xs: 2, md: 2.5 } }}>
+                        <Typography sx={{ fontSize: '11px', fontWeight: 700, color: T.muted, textTransform: 'uppercase', letterSpacing: '.4px', mb: 0.75 }}>Points critiques</Typography>
+                        <Typography sx={{ ...NUM, fontSize: { xs: '20px', md: '24px' }, fontWeight: 800, letterSpacing: '-.4px', lineHeight: 1, color: pointsCritiques > 0 ? T.neg : T.pos }}>{pointsCritiques}</Typography>
+                    </Box>
+                    <Box sx={{ flex: 1, minWidth: 0, p: { xs: 2, md: 2.5 } }}>
+                        <Typography sx={{ fontSize: '11px', fontWeight: 700, color: T.muted, textTransform: 'uppercase', letterSpacing: '.4px', mb: 0.75 }}>Restants à valider</Typography>
                         {(() => {
                             const restant = controlesGrouped.reduce((sum, c) => sum + (c.anomalies || 0), 0);
-                            return (
-                                <>
-                                    <Typography sx={{ ...NUM, color: restant > 0 ? T.warn : T.pos, fontWeight: 800, fontSize: '20px', lineHeight: 1 }}>{restant}</Typography>
-                                    {restant > 0
-                                        ? <WarningAmber sx={{ color: T.warn, fontSize: 18 }} />
-                                        : <CheckCircleOutline sx={{ color: T.pos, fontSize: 18 }} />}
-                                </>
-                            );
+                            return <Typography sx={{ ...NUM, fontSize: { xs: '20px', md: '24px' }, fontWeight: 800, letterSpacing: '-.4px', lineHeight: 1, color: restant > 0 ? T.warn : T.pos }}>{restant}</Typography>;
                         })()}
-                    </Stack>
-                </Box>
-                <Box sx={{ ml: 'auto' }}>
-                    <Button
-                        variant="contained"
-                        onClick={handleControler}
-                        disabled={!effectiveExerciceId || confirmReviserLoading}
-                        sx={{
-                            height: 34,
-                            bgcolor: T.accent,
-                            textTransform: 'none',
-                            fontWeight: 700,
-                            px: 3,
-                            borderRadius: '10px',
-                            boxShadow: 'none',
-                            '&:hover': { bgcolor: T.accentDark, boxShadow: 'none' },
-                        }}
-                    >
-                        {confirmReviserLoading ? 'Révision…' : 'Réviser'}
-                    </Button>
-                </Box>
-            </Stack>
+                    </Box>
+                    <Box sx={{ flex: 2, minWidth: 0, p: { xs: 2, md: 2.5 }, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+                        <Button
+                            variant="contained"
+                            disableElevation
+                            onClick={handleControler}
+                            disabled={!effectiveExerciceId || confirmReviserLoading}
+                            startIcon={confirmReviserLoading ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <RestartAltOutlined />}
+                            sx={{
+                                height: 34,
+                                bgcolor: T.accent,
+                                textTransform: 'none',
+                                fontWeight: 700,
+                                px: 3,
+                                borderRadius: '10px',
+                                boxShadow: 'none',
+                                '&:hover': { bgcolor: T.accentDark, boxShadow: 'none' },
+                            }}
+                        >
+                            {confirmReviserLoading ? 'Révision…' : 'Réviser'}
+                        </Button>
+                    </Box>
+                </Stack>
+            </Box>
 
             <Paper elevation={0} sx={{ p: 2, ...panelSx, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                 {loadingControles ? (

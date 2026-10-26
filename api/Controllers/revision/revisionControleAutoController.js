@@ -15,7 +15,7 @@ const insertOrUpdateCommentaire = async ({
   valide,
   commentaire
 }) => {
-  const finalPeriodeId = id_periode || null;
+  const finalPeriodeId = (id_periode !== undefined && id_periode !== null && id_periode !== '') ? parseInt(id_periode, 10) : null;
   const finalValide = valide || false;
   const finalCommentaire = commentaire || '';
 
@@ -24,42 +24,51 @@ const insertOrUpdateCommentaire = async ({
   const idDossierNum = parseInt(id_dossier, 10);
   const idExerciceNum = parseInt(id_exercice, 10);
 
+  // Requêtes paramétrées (bind) : plus d'interpolation directe dans le SQL.
+  const scopeReplacements = {
+    id_compte: idCompteNum,
+    id_dossier: idDossierNum,
+    id_exercice: idExerciceNum,
+    id_controle: String(id_controle),
+    id_jnl: String(id_jnl),
+    id_periode: finalPeriodeId,
+  };
+  const periodeCond = finalPeriodeId === null ? 'IS NULL' : '= :id_periode';
+
   // Vérifier si un enregistrement existe déjà (par id_controle + id_jnl)
   const existing = await db.sequelize.query(`
-    SELECT id FROM revision_commentaire_anomalies 
-    WHERE id_compte = ${idCompteNum} 
-      AND id_dossier = ${idDossierNum} 
-      AND id_exercice = ${idExerciceNum}
-      AND id_controle = '${id_controle}'
-      AND id_jnl = '${id_jnl}'
-      AND id_periode ${finalPeriodeId === null ? 'IS NULL' : `= ${finalPeriodeId}`}
-  `, { type: db.Sequelize.QueryTypes.SELECT });
+    SELECT id FROM revision_commentaire_anomalies
+    WHERE id_compte = :id_compte
+      AND id_dossier = :id_dossier
+      AND id_exercice = :id_exercice
+      AND id_controle = :id_controle
+      AND id_jnl = :id_jnl
+      AND id_periode ${periodeCond}
+  `, { replacements: scopeReplacements, type: db.Sequelize.QueryTypes.SELECT });
 
   if (existing.length > 0) {
     // UPDATE
     await db.sequelize.query(`
-      UPDATE revision_commentaire_anomalies 
-      SET valide = ${finalValide},
-          commentaire = '${finalCommentaire.replace(/'/g, "''")}',
+      UPDATE revision_commentaire_anomalies
+      SET valide = :valide,
+          commentaire = :commentaire,
           "updatedAt" = NOW()
-      WHERE id_compte = ${idCompteNum} 
-        AND id_dossier = ${idDossierNum} 
-        AND id_exercice = ${idExerciceNum}
-        AND id_controle = '${id_controle}'
-        AND id_jnl = '${id_jnl}'
-        AND id_periode ${finalPeriodeId === null ? 'IS NULL' : `= ${finalPeriodeId}`}
-    `);
+      WHERE id_compte = :id_compte
+        AND id_dossier = :id_dossier
+        AND id_exercice = :id_exercice
+        AND id_controle = :id_controle
+        AND id_jnl = :id_jnl
+        AND id_periode ${periodeCond}
+    `, { replacements: { ...scopeReplacements, valide: finalValide, commentaire: finalCommentaire } });
   } else {
     // INSERT avec id_controle et id_jnl
     await db.sequelize.query(`
       INSERT INTO revision_commentaire_anomalies (
         id_compte, id_dossier, id_exercice, id_periode, id_controle, id_jnl, valide, commentaire, "createdAt", "updatedAt"
       ) VALUES (
-        ${idCompteNum}, ${idDossierNum}, ${idExerciceNum}, ${finalPeriodeId || 'NULL'}, 
-        '${id_controle}', '${id_jnl}'
-        ${finalValide}, '${finalCommentaire.replace(/'/g, "''")}', NOW(), NOW()
+        :id_compte, :id_dossier, :id_exercice, :id_periode, :id_controle, :id_jnl, :valide, :commentaire, NOW(), NOW()
       )
-    `);
+    `, { replacements: { ...scopeReplacements, valide: finalValide, commentaire: finalCommentaire } });
   }
 };
 const insertLineAnomaly = async ({
@@ -77,21 +86,34 @@ const insertLineAnomaly = async ({
     const lineId = line.id;
     // Extract the account number from the line (comptegen or compteaux)
     const numCompte = line.comptegen || line.compteaux || '';
-    const finalPeriodeId = idPeriode || 'NULL';
+    const finalPeriodeId = (idPeriode !== undefined && idPeriode !== null && idPeriode !== 'NULL' && idPeriode !== '') ? parseInt(idPeriode, 10) : null;
 
     const insertQuery = `
       INSERT INTO table_controle_anomalies (
-        id_compte, id_dossier, id_exercice, id_jnl, id_num_compte, "codeCtrl", id_controle, message, 
+        id_compte, id_dossier, id_exercice, id_jnl, id_num_compte, "codeCtrl", id_controle, message,
         id_periode, "createdAt", "updatedAt"
       ) VALUES (
-        ${id_compte}, ${id_dossier}, ${id_exercice}, '${lineId}', '${numCompte.replace(/'/g, "''")}', '${type}', 
-        '${id_controle}', '${message.replace(/'/g, "''")}', 
-        ${finalPeriodeId}, NOW(), NOW()
+        :id_compte, :id_dossier, :id_exercice, :id_jnl, :id_num_compte, :codeCtrl,
+        :id_controle, :message,
+        :id_periode, NOW(), NOW()
       )
       RETURNING id
     `;
 
-    const result = await db.sequelize.query(insertQuery, { type: db.Sequelize.QueryTypes.INSERT });
+    const result = await db.sequelize.query(insertQuery, {
+      replacements: {
+        id_compte: parseInt(id_compte, 10),
+        id_dossier: parseInt(id_dossier, 10),
+        id_exercice: parseInt(id_exercice, 10),
+        id_jnl: String(lineId),
+        id_num_compte: String(numCompte),
+        codeCtrl: String(type),
+        id_controle: String(id_controle),
+        message: String(message),
+        id_periode: finalPeriodeId,
+      },
+      type: db.Sequelize.QueryTypes.INSERT,
+    });
     return result[0]?.id || null;
   } catch (error) {
     console.error(`[insertLineAnomaly] ERROR for line ${line?.id}:`, error.message);
@@ -105,13 +127,22 @@ const insertLineAnomaly = async ({
 const insertLineAnomaliesBatch = async (anomalies) => {
   if (!anomalies || anomalies.length === 0) return;
 
+  const replacements = {};
   const valuesSql = anomalies.map(({
     id_compte, id_dossier, id_exercice, line, type, id_controle, message, idPeriode = null
-  }) => {
-    const lineId = line.id;
+  }, i) => {
     const numCompte = line.comptegen || line.compteaux || '';
-    const finalPeriodeId = idPeriode || 'NULL';
-    return `(${id_compte}, ${id_dossier}, ${id_exercice}, '${lineId}', '${numCompte.replace(/'/g, "''")}', '${type}', '${id_controle}', '${message.replace(/'/g, "''")}', ${finalPeriodeId}, NOW(), NOW())`;
+    const finalPeriodeId = (idPeriode !== undefined && idPeriode !== null && idPeriode !== 'NULL' && idPeriode !== '') ? parseInt(idPeriode, 10) : null;
+    replacements[`c${i}`] = parseInt(id_compte, 10);
+    replacements[`d${i}`] = parseInt(id_dossier, 10);
+    replacements[`e${i}`] = parseInt(id_exercice, 10);
+    replacements[`jnl${i}`] = String(line.id);
+    replacements[`num${i}`] = String(numCompte);
+    replacements[`ctrl${i}`] = String(type);
+    replacements[`ctl${i}`] = String(id_controle);
+    replacements[`msg${i}`] = String(message);
+    replacements[`per${i}`] = finalPeriodeId;
+    return `(:c${i}, :d${i}, :e${i}, :jnl${i}, :num${i}, :ctrl${i}, :ctl${i}, :msg${i}, :per${i}, NOW(), NOW())`;
   }).join(',\n');
 
   const insertQuery = `
@@ -121,7 +152,7 @@ const insertLineAnomaliesBatch = async (anomalies) => {
     ) VALUES ${valuesSql}
   `;
 
-  await db.sequelize.query(insertQuery, { type: db.Sequelize.QueryTypes.INSERT });
+  await db.sequelize.query(insertQuery, { replacements, type: db.Sequelize.QueryTypes.INSERT });
 };
 
 // Récupérer les contrôles de révision pour un exercice, et les créer s'ils n'existent pas

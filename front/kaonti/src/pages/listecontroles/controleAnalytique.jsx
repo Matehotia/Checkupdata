@@ -1,13 +1,14 @@
 import React, { useEffect, useState, forwardRef, useImperativeHandle } from 'react';
 import { 
-  Box, Typography, Stack, Divider, IconButton, Paper, Tooltip, Chip, Button 
+  Box, Typography, Stack, Divider, IconButton, Paper, Tooltip, Chip, Button, CircularProgress
 } from '@mui/material';
-import { 
-  CheckCircleOutline, 
-  ChatBubbleOutline, 
+import {
+  CheckCircleOutline,
+  ChatBubbleOutline,
   ErrorOutline,
   AssessmentOutlined,
-  QueryStatsOutlined
+  QueryStatsOutlined,
+  RestartAltOutlined
 } from '@mui/icons-material';
 import { DataGrid } from '@mui/x-data-grid';
 import axios from '../../../config/axios';
@@ -233,47 +234,35 @@ const ControleAnalytique = forwardRef(({ id_exercice, id_periode }, ref) => {
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', overflow: 'hidden', bgcolor: T.canvas }}>
 
       {/* --- STATISTIQUES GLOBALES --- */}
-      <Stack
-        direction="row"
-        spacing={3}
-        alignItems="center"
-        sx={{
-          px: 2.5,
-          py: 1.5,
-          bgcolor: T.surface,
-          borderBottom: `1px solid ${T.line}`,
-          position: 'sticky',
-          top: 0,
-          zIndex: 2
-        }}
-      >
-        <Box>
-          <Typography sx={statLabelSx}>Erreurs d'imputation</Typography>
-          <Stack direction="row" spacing={0.75} alignItems="center">
-            <Typography sx={{ ...NUM, color: rows.length > 0 ? T.neg : T.pos, fontWeight: 800, fontSize: '20px', lineHeight: 1 }}>{rows.length}</Typography>
-            <AssessmentOutlined sx={{ color: rows.length > 0 ? T.neg : T.pos, fontSize: 18 }} />
-          </Stack>
-        </Box>
-        <Box sx={{ ml: 'auto' }}>
-          <Button
-            variant="contained"
-            onClick={handleAskControler}
-            disabled={!effectiveExerciceId || !effectivePeriodeId || effectivePeriodeId === 'exercice' || loading}
-            sx={{
-              height: 34,
-              bgcolor: T.accent,
-              textTransform: 'none',
-              fontWeight: 700,
-              px: 3,
-              borderRadius: '10px',
-              boxShadow: 'none',
-              '&:hover': { bgcolor: T.accentDark, boxShadow: 'none' },
-            }}
-          >
-            {loading ? 'Contrôle...' : 'Contrôler'}
-          </Button>
-        </Box>
-      </Stack>
+      <Box sx={{ border: `1px solid ${T.line}`, borderRadius: '14px', overflow: 'hidden', mx: 2, mt: 2, mb: 1.5, bgcolor: T.surface, flexShrink: 0 }}>
+        <Stack direction="row" divider={<Box sx={{ width: '1px', bgcolor: T.line }} />} flexWrap="wrap" alignItems="center">
+          <Box sx={{ flex: 1, minWidth: 0, p: { xs: 2, md: 2.5 } }}>
+            <Typography sx={{ fontSize: '11px', fontWeight: 700, color: T.muted, textTransform: 'uppercase', letterSpacing: '.4px', mb: 0.75 }}>Erreurs d&apos;imputation</Typography>
+            <Typography sx={{ ...NUM, fontSize: { xs: '20px', md: '24px' }, fontWeight: 800, letterSpacing: '-.4px', lineHeight: 1, color: rows.length > 0 ? T.neg : T.pos }}>{rows.length}</Typography>
+          </Box>
+          <Box sx={{ flex: 2, minWidth: 0, p: { xs: 2, md: 2.5 }, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+            <Button
+              variant="contained"
+              disableElevation
+              startIcon={loading ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <RestartAltOutlined />}
+              onClick={handleAskControler}
+              disabled={!effectiveExerciceId || !effectivePeriodeId || effectivePeriodeId === 'exercice' || loading}
+              sx={{
+                height: 34,
+                bgcolor: T.accent,
+                textTransform: 'none',
+                fontWeight: 700,
+                px: 3,
+                borderRadius: '10px',
+                boxShadow: 'none',
+                '&:hover': { bgcolor: T.accentDark, boxShadow: 'none' },
+              }}
+            >
+              {loading ? 'Contrôle...' : 'Contrôler'}
+            </Button>
+          </Box>
+        </Stack>
+      </Box>
 
       <ConfirmActionDialog
         open={confirmOpen}

@@ -416,9 +416,14 @@ const ImportJournal = () => {
         const exerciceNId = resData.list?.filter((item) => item.libelle_rang === "N");
         setListeSituation(exerciceNId);
 
-        setSelectedExerciceId(exerciceNId[0].id);
-        setSelectedPeriodeChoiceId(0);
-        setSelectedPeriodeId(exerciceNId[0].id);
+        // Cible par défaut : l'exercice "N" s'il existe, sinon le premier de la liste
+        // (évite un plantage + un id_exercice=0 quand aucun rang "N" n'est renseigné).
+        const cible = (exerciceNId && exerciceNId.length > 0) ? exerciceNId[0] : (resData.list && resData.list[0]);
+        if (cible) {
+          setSelectedExerciceId(cible.id);
+          setSelectedPeriodeChoiceId(0);
+          setSelectedPeriodeId(cible.id);
+        }
 
       } else {
         setListeExercice([]);
@@ -1377,11 +1382,19 @@ const ImportJournal = () => {
               size="small"
               sx={{ ...NUM, fontSize: '13px', fontWeight: 700, color: T.ink, '& .MuiSelect-select': { py: 0, pr: '20px !important' } }}
             >
-              {listeExercice.map((option) => (
-                <MenuItem key={option.id} value={option.id} sx={{ ...NUM, fontSize: '13px' }}>
-                  {format(option.date_debut, "dd/MM/yyyy")} – {format(option.date_fin, "dd/MM/yyyy")}
-                </MenuItem>
-              ))}
+              {listeExercice.map((option) => {
+                // date-fns format() exige un objet Date : l'API renvoie des chaînes ISO
+                // (sinon les dates apparaissaient vides).
+                const fmt = (d) => {
+                  const x = d ? new Date(d) : null;
+                  return x && !isNaN(x.getTime()) ? format(x, "dd/MM/yyyy") : "—";
+                };
+                return (
+                  <MenuItem key={option.id} value={option.id} sx={{ ...NUM, fontSize: '13px' }}>
+                    {fmt(option.date_debut)} – {fmt(option.date_fin)}
+                  </MenuItem>
+                );
+              })}
             </Select>
           </Stack>
         </Stack>

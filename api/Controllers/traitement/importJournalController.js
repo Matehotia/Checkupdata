@@ -494,6 +494,17 @@ const importJournalWithProgressLogic = async (req, res, progress) => {
     progress.step('Préparation de l\'import...', 5);
 
     if (valSelectCptDispatch === 'ECRASER') {
+      // Purger d'abord les tables qui référencent journals par FK sans ON DELETE CASCADE,
+      // sinon la suppression des journals échoue (violation de contrainte).
+      // Ces données (analytique + caches de contrôles) sont recréées / recalculées ensuite.
+      const scopeRepl = { c: Number(compteId), d: Number(fileId), e: Number(selectedPeriodeId) };
+      const inScope = 'IN (SELECT id FROM journals WHERE id_compte = :c AND id_dossier = :d AND id_exercice = :e)';
+      await db.sequelize.query(`DELETE FROM analytiques WHERE id_ligne_ecriture ${inScope}`, { replacements: scopeRepl });
+      await db.sequelize.query(`DELETE FROM analyse_fournisseur_lignes WHERE id_ligne ${inScope}`, { replacements: scopeRepl });
+      await db.sequelize.query(`DELETE FROM analyse_client_lignes WHERE id_ligne ${inScope}`, { replacements: scopeRepl });
+      await db.sequelize.query(`DELETE FROM recherche_doublons WHERE id_jnl ${inScope}`, { replacements: scopeRepl });
+      await db.sequelize.query(`DELETE FROM revision_analytique_resultats WHERE id_jnl ${inScope}`, { replacements: scopeRepl });
+
       await journals.destroy({
         where: {
           id_compte: Number(compteId),

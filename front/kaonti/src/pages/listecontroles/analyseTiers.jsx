@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState, useRef, forwardRef, useImperativeH
 import { useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Stack, Divider, IconButton, Button, Dialog, DialogTitle, DialogContent, DialogActions,
-  Autocomplete, TextField, Tooltip, Paper, Chip, Tabs, Tab, Badge
+  Autocomplete, TextField, Tooltip, Paper, Chip, Tabs, Tab, Badge, CircularProgress
 } from '@mui/material';
 
 import {
@@ -12,7 +12,7 @@ import {
 } from '@mui/icons-material';
 
 import {
-  Cancel, CheckCircle, Search
+  Cancel, CheckCircle, Search, RestartAltOutlined
 } from '@mui/icons-material';
 import CommentIcon from '@mui/icons-material/Comment';
 import { DataGrid } from '@mui/x-data-grid';
@@ -538,49 +538,42 @@ const AnalyseTiers = forwardRef(({ id_exercice, id_periode }, ref) => {
       />
 
       {/* --- RÉCAPITULATIF GLOBAL --- */}
-      <Stack direction="row" spacing={3} alignItems="center" sx={{ px: 2.5, py: 1.5, bgcolor: T.surface, borderBottom: `1px solid ${T.line}` }}>
-        <Box>
-          <Typography sx={statLabelSx}>Anomalies tiers</Typography>
-          <Stack direction="row" spacing={0.75} alignItems="center">
-            <Typography sx={{ ...NUM, color: T.neg, fontWeight: 800, fontSize: '20px', lineHeight: 1 }}>{rowsFournisseur.length + rowsClient.length}</Typography>
-            <ErrorOutline sx={{ color: T.neg, fontSize: 18 }} />
-          </Stack>
-        </Box>
-        <Divider orientation="vertical" flexItem sx={{ borderColor: T.line }} />
-        <Box>
-          <Typography sx={statLabelSx}>Restant à valider</Typography>
-          {(() => {
-            const restant = rowsFournisseur.filter(r => !r.valider).length + rowsClient.filter(r => !r.valider).length;
-            return (
-              <Stack direction="row" spacing={0.75} alignItems="center">
-                <Typography sx={{ ...NUM, color: restant > 0 ? T.warn : T.pos, fontWeight: 800, fontSize: '20px', lineHeight: 1 }}>{restant}</Typography>
-                {restant > 0 ? <WarningAmberRounded sx={{ color: T.warn, fontSize: 18 }} /> : <CheckCircleOutline sx={{ color: T.pos, fontSize: 18 }} />}
-              </Stack>
-            );
-          })()}
-        </Box>
-        <Box sx={{ ml: 'auto' }}>
-          <Button
-            variant="contained"
-            startIcon={<Search />}
-            onClick={handleAnalyserClick}
-            disabled={!effectiveExerciceId || loading}
-            sx={{
-              height: 34,
-              bgcolor: T.accent,
-              textTransform: 'none',
-              fontWeight: 700,
-              px: 3,
-              borderRadius: '10px',
-              boxShadow: 'none',
-              '&:hover': { bgcolor: T.accentDark, boxShadow: 'none' },
-            }}
-          >
-            {loading ? 'Analyse...' : 'Analyser'}
-          </Button>
-        </Box>
-
-      </Stack>
+      <Box sx={{ border: `1px solid ${T.line}`, borderRadius: '14px', overflow: 'hidden', mx: 2, mt: 2, mb: 1.5, bgcolor: T.surface, flexShrink: 0 }}>
+        <Stack direction="row" divider={<Box sx={{ width: '1px', bgcolor: T.line }} />} flexWrap="wrap" alignItems="center">
+          <Box sx={{ flex: 1, minWidth: 0, p: { xs: 2, md: 2.5 } }}>
+            <Typography sx={{ fontSize: '11px', fontWeight: 700, color: T.muted, textTransform: 'uppercase', letterSpacing: '.4px', mb: 0.75 }}>Anomalies tiers</Typography>
+            <Typography sx={{ ...NUM, fontSize: { xs: '20px', md: '24px' }, fontWeight: 800, letterSpacing: '-.4px', lineHeight: 1, color: (rowsFournisseur.length + rowsClient.length) > 0 ? T.neg : T.pos }}>{rowsFournisseur.length + rowsClient.length}</Typography>
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0, p: { xs: 2, md: 2.5 } }}>
+            <Typography sx={{ fontSize: '11px', fontWeight: 700, color: T.muted, textTransform: 'uppercase', letterSpacing: '.4px', mb: 0.75 }}>Restant à valider</Typography>
+            {(() => {
+              const restant = rowsFournisseur.filter(r => !r.valider).length + rowsClient.filter(r => !r.valider).length;
+              return <Typography sx={{ ...NUM, fontSize: { xs: '20px', md: '24px' }, fontWeight: 800, letterSpacing: '-.4px', lineHeight: 1, color: restant > 0 ? T.warn : T.pos }}>{restant}</Typography>;
+            })()}
+          </Box>
+          <Box sx={{ flex: 2, minWidth: 0, p: { xs: 2, md: 2.5 }, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+            <Button
+              variant="contained"
+              disableElevation
+              startIcon={loading ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <RestartAltOutlined />}
+              onClick={handleAnalyserClick}
+              disabled={!effectiveExerciceId || loading}
+              sx={{
+                height: 34,
+                bgcolor: T.accent,
+                textTransform: 'none',
+                fontWeight: 700,
+                px: 3,
+                borderRadius: '10px',
+                boxShadow: 'none',
+                '&:hover': { bgcolor: T.accentDark, boxShadow: 'none' },
+              }}
+            >
+              {loading ? 'Analyse...' : 'Analyser'}
+            </Button>
+          </Box>
+        </Stack>
+      </Box>
 
       <Box sx={{ p: 2, flexGrow: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
 

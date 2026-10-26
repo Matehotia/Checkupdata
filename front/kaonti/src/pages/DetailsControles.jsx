@@ -33,6 +33,7 @@ import EquilibreDebitCredit from './listecontroles/EquilibreDebitCredit';
 import CaisseCreditrice from './listecontroles/CaisseCreditrice';
 import CoherenceHtTva from './listecontroles/CoherenceHtTva';
 import TauxTva from './listecontroles/TauxTva';
+import RevueAnalytiqueNN1 from './listecontroles/RevueAnalytiqueNN1';
 import SequenceCheque from './listecontroles/SequenceCheque';
 import FactureVente from './listecontroles/FactureVente';
 import ExercicePeriodeSelector from './ExercicePeriodeSelector';
@@ -74,7 +75,7 @@ const CONTROL_GROUPS = [
   {
     title: 'Cohérence & revue analytique',
     items: [
-      { id: 'revueAnalytiqueNN1', label: 'Revue analytique N/N-1', icon: PH, placeholder: true },
+      { id: 'revueAnalytiqueNN1', label: 'Revue analytique N/N-1', icon: <CompareArrowsOutlined sx={{ fontSize: 20 }} /> },
       { id: 'mensuelle', label: 'Revue analytique mensuelle', icon: <CalendarMonthOutlined sx={{ fontSize: 20 }} /> },
       { id: 'nn1', label: 'Contrôle Global', icon: <CompareArrowsOutlined sx={{ fontSize: 20 }} /> },
       { id: 'atypique', label: 'Recherche de montants atypiques', icon: <TrendingUpOutlined sx={{ fontSize: 20 }} />, revisionType: 'ATYPIQUE' },
@@ -532,6 +533,12 @@ const DetailsControles = () => {
             )}
             {activeControl === 'tauxTva' && (
               <TauxTva
+                id_exercice={selectedExerciceId}
+                id_periode={selectedPeriodeId}
+              />
+            )}
+            {activeControl === 'revueAnalytiqueNN1' && (
+              <RevueAnalytiqueNN1
                 id_exercice={selectedExerciceId}
                 id_periode={selectedPeriodeId}
               />

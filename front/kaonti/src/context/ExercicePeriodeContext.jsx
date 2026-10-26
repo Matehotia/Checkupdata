@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import axios from '../../config/axios';
 import useAuth from '../hooks/useAuth';
 import { jwtDecode } from 'jwt-decode';
@@ -20,6 +20,13 @@ export const ExercicePeriodeProvider = ({ children }) => {
     const [listeExercice, setListeExercice] = useState([]);
     const [listePeriodes, setListePeriodes] = useState([]);
     const [loading, setLoading] = useState(false);
+
+    // Clés de persistance (sessionStorage) pour conserver le choix après rechargement de page.
+    const STORAGE_EXERCICE = 'exercicePeriode_exerciceId';
+    const STORAGE_PERIODE = 'exercicePeriode_periodeId';
+    // La restauration de la période ne doit se faire qu'une seule fois (au montage),
+    // pas à chaque changement d'exercice par l'utilisateur.
+    const periodeRestoredRef = useRef(false);
 
     // Récupérer les IDs depuis JWT token (priorité) et sessionStorage (fallback)
     const { auth } = useAuth();
@@ -47,9 +54,13 @@ export const ExercicePeriodeProvider = ({ children }) => {
             const resData = response.data;
             if (resData.state) {
                 setListeExercice(resData.list || []);
-                // Auto-sélectionner le premier exercice si aucun n'est sélectionné
+                // Si aucun exercice sélectionné (ex. après rechargement de page),
+                // restaurer le dernier choix mémorisé s'il existe encore dans la liste,
+                // sinon prendre le premier exercice par défaut.
                 if (resData.list && resData.list.length > 0 && !selectedExerciceId) {
-                    setSelectedExerciceId(resData.list[0].id);
+                    const stored = sessionStorage.getItem(STORAGE_EXERCICE);
+                    const match = stored ? resData.list.find(e => String(e.id) === String(stored)) : null;
+                    setSelectedExerciceId(match ? match.id : resData.list[0].id);
                 }
             }
         } catch (error) {
@@ -148,6 +159,42 @@ export const ExercicePeriodeProvider = ({ children }) => {
             setListePeriodes([]);
         }
     }, [selectedExerciceId, fetchPeriodes]);
+
+    // Mémoriser l'exercice sélectionné (persiste après rechargement de page)
+    useEffect(() => {
+        if (selectedExerciceId) {
+            sessionStorage.setItem(STORAGE_EXERCICE, String(selectedExerciceId));
+        }
+    }, [selectedExerciceId]);
+
+    // Mémoriser la période sélectionnée.
+    // IMPORTANT : ne pas toucher au sessionStorage tant que la restauration initiale
+    // n'a pas eu lieu, sinon le '' du montage effacerait la période à restaurer.
+    useEffect(() => {
+        if (!periodeRestoredRef.current) return;
+        if (selectedPeriodeId) {
+            sessionStorage.setItem(STORAGE_PERIODE, String(selectedPeriodeId));
+        } else {
+            sessionStorage.removeItem(STORAGE_PERIODE);
+        }
+    }, [selectedPeriodeId]);
+
+    // Restaurer la période mémorisée UNE SEULE FOIS, une fois les périodes chargées au montage.
+    // (On n'écrase pas le choix quand l'utilisateur change ensuite d'exercice.)
+    useEffect(() => {
+        if (periodeRestoredRef.current) return;
+        if (!selectedPeriodeId && listePeriodes.length > 0) {
+            const stored = sessionStorage.getItem(STORAGE_PERIODE);
+            if (stored && stored !== 'exercice') {
+                const p = listePeriodes.find(pp => String(pp.id) === String(stored));
+                if (p) {
+                    setSelectedPeriodeId(p.id);
+                    setSelectedPeriodeDates({ date_debut: p.date_debut, date_fin: p.date_fin });
+                }
+            }
+            periodeRestoredRef.current = true;
+        }
+    }, [listePeriodes, selectedPeriodeId]);
 
     const value = {
         // États
