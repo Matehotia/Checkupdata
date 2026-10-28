@@ -20,7 +20,7 @@ const GROUPES = [
   { id: 'ORG_A_PAYER',   prefixes: ['438'],               sens: 'C', libelle: 'Organismes sociaux - charges à payer' },
 ];
 
-const PREFIXE_CHARGE = ['64'];             // charges de personnel
+const PREFIXE_CHARGE = ['64'];   
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
