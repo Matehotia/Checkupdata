@@ -40,7 +40,7 @@ const SECTIONS_CONFIG = [
     id: "coherence",
     title: "Cohérence & revue analytique",
     items: [
-      { id: "revueAnalytiqueNN1", title: "Revue analytique N/N-1", source: { kind: 'todo' }, pending: true, anomalies: 0, remaining: 0 },
+      { id: "revueAnalytiqueNN1", title: "Revue analytique N/N-1", source: { kind: 'revueNN1Paie' }, anomalies: 0, remaining: 0 },
       { id: "revueMensuelle", title: "Revue analytique mensuelle", source: { kind: 'revu', typeRevue: 'analytiqueMensuelle' }, anomalies: 0, remaining: 0 },
       { id: "revueNN1", title: "Contrôle Global", source: { kind: 'revu', typeRevue: 'analytiqueNN1' }, anomalies: 0, remaining: 0 },
       { id: "atypique", title: "Recherche de montants atypiques", source: { kind: 'controleAutoType', codeCtrl: 'ATYPIQUE' }, anomalies: 0, remaining: 0 },
@@ -552,8 +552,14 @@ export default function DashboardComponent() {
         factureVenteUrl += `?id_periode=${selectedPeriodeId}`;
       }
 
+      // Revue analytique N/N-1 (paie 42/43) : compteur depuis la table, scopé par période.
+      let revueNN1PaieUrl = `/administration/revueAnalytiqueNN1/${id_compte}/${id_dossier}/${id_exercice}/stats`;
+      if (hasPeriode) {
+        revueNN1PaieUrl += `?id_periode=${selectedPeriodeId}`;
+      }
+
       // Un seul appel réseau par source, tous en parallèle.
-      const [controleAutoData, doublonsData, fournisseurClientData, revuNN1Data, revuMensuelleData, suspenseData, equilibreData, caisseData, coherenceHtTvaData, tauxTvaData, sequenceChequeData, factureVenteData] =
+      const [controleAutoData, doublonsData, fournisseurClientData, revuNN1Data, revuMensuelleData, suspenseData, equilibreData, caisseData, coherenceHtTvaData, tauxTvaData, sequenceChequeData, factureVenteData, revueNN1PaieData] =
         await Promise.all([
           safeGet(controleAutoUrl),
           safeGet(doublonsUrl),
@@ -567,6 +573,7 @@ export default function DashboardComponent() {
           safeGet(tauxTvaUrl),
           safeGet(sequenceChequeUrl),
           safeGet(factureVenteUrl),
+          safeGet(revueNN1PaieUrl),
         ]);
 
       // Map des détails du contrôle auto, indexé par type (= codeCtrl).
@@ -623,6 +630,11 @@ export default function DashboardComponent() {
             return {
               anomalies: factureVenteData.total_anomalies || 0,
               remaining: factureVenteData.restantes || 0,
+            };
+          case 'revueNN1Paie':
+            return {
+              anomalies: revueNN1PaieData.total_anomalies || 0,
+              remaining: revueNN1PaieData.restantes || 0,
             };
           case 'revu': {
             const d = source.typeRevue === 'analytiqueMensuelle' ? revuMensuelleData : revuNN1Data;
