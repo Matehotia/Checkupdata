@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Box, Typography, Stack, Chip, CircularProgress, Button, Tooltip, Badge, IconButton,
   Table, TableHead, TableBody, TableRow, TableCell, TableContainer,
@@ -68,6 +68,7 @@ const RevueAnalytiqueNN1 = ({ id_exercice, id_periode }) => {
   // Popup de confirmation validation / dévalidation
   const [confirmValide, setConfirmValide] = useState({ open: false, row: null, next: false });
   const [confirmLoading, setConfirmLoading] = useState(false);
+  const [confirmReviser, setConfirmReviser] = useState(false);
 
   const fetchStored = useCallback(async () => {
     if (!effectiveExerciceId) return;
@@ -168,7 +169,7 @@ const RevueAnalytiqueNN1 = ({ id_exercice, id_periode }) => {
               variant="contained"
               disableElevation
               startIcon={revising ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <RestartAltOutlined />}
-              onClick={handleReviser}
+              onClick={() => setConfirmReviser(true)}
               disabled={revising || !effectiveExerciceId}
               sx={{ bgcolor: T.accent, textTransform: 'none', fontWeight: 700, '&:hover': { bgcolor: T.accentDark } }}
             >
@@ -270,6 +271,17 @@ const RevueAnalytiqueNN1 = ({ id_exercice, id_periode }) => {
         title={`Commentaire - ${commentRow?.code || ''}`}
         placeholder="Saisissez votre commentaire..."
         loading={commentSaving}
+      />
+
+      <ConfirmActionDialog
+        open={confirmReviser}
+        onClose={() => setConfirmReviser(false)}
+        onConfirm={async () => { await handleReviser(); setConfirmReviser(false); }}
+        title="Réviser ce contrôle"
+        message="Lancer le contrôle et enregistrer les résultats ? Les résultats précédents seront remplacés."
+        confirmText="Réviser"
+        loading={revising}
+        color={T.accent}
       />
 
       <ConfirmActionDialog

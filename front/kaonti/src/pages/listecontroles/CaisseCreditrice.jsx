@@ -9,6 +9,7 @@ import useAxiosPrivate from '../../hooks/useAxiosPrivate';
 import useAuth from '../../hooks/useAuth';
 import { useExercicePeriode } from '../../context/ExercicePeriodeContext';
 import { jwtDecode } from 'jwt-decode';
+import ConfirmActionDialog from '../../components/ConfirmActionDialog';
 
 // ─── Design (aligné sur DetailsControles) ───
 const T = {
@@ -56,6 +57,7 @@ const CaisseCreditrice = ({ id_exercice, id_periode }) => {
 
   const [loading, setLoading] = useState(false);
   const [revising, setRevising] = useState(false);
+  const [confirmReviser, setConfirmReviser] = useState(false);
   const [data, setData] = useState(null);
 
   // Lecture des anomalies enregistrées (pas de recalcul)
@@ -151,7 +153,7 @@ const CaisseCreditrice = ({ id_exercice, id_periode }) => {
               variant="contained"
               disableElevation
               startIcon={revising ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <RestartAltOutlined />}
-              onClick={handleReviser}
+              onClick={() => setConfirmReviser(true)}
               disabled={revising}
               sx={{ ml: 'auto', bgcolor: T.accent, textTransform: 'none', fontWeight: 700, '&:hover': { bgcolor: '#0B6870' } }}
             >
@@ -204,6 +206,16 @@ const CaisseCreditrice = ({ id_exercice, id_periode }) => {
             </TableBody>
           </Table>
         </TableContainer>
+      <ConfirmActionDialog
+        open={confirmReviser}
+        onClose={() => setConfirmReviser(false)}
+        onConfirm={async () => { await handleReviser(); setConfirmReviser(false); }}
+        title="Réviser ce contrôle"
+        message="Lancer le contrôle et enregistrer les résultats ? Les résultats précédents seront remplacés."
+        confirmText="Réviser"
+        loading={revising}
+        color="#0E7C86"
+      />
     </Box>
   );
 };
