@@ -1,14 +1,12 @@
-import React, { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import {
   Box, Typography, Stack, IconButton, Tooltip, Divider, Chip, Badge, alpha,
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import {
-  CheckCircle, Cancel, ErrorOutline,
   CheckCircleOutline, WarningAmberRounded, RadioButtonUnchecked,
   TaskAltRounded, ChatBubbleOutlineOutlined
 } from '@mui/icons-material';
-import CommentIcon from '@mui/icons-material/Comment';
 import useAxiosPrivate from '../../hooks/useAxiosPrivate';
 import useAuth from '../../hooks/useAuth';
 import { jwtDecode } from 'jwt-decode';
@@ -306,7 +304,7 @@ const RevueAnalytiqueTable = forwardRef(function RevueAnalytiqueTable({ id_exerc
         const isAnomaly = !!params.row.anomalies;
         return (
           <Tooltip title={isValid ? 'Validé — cliquer pour dévalider' : (isAnomaly ? 'À valider — cliquer pour valider' : 'Rien à valider')} arrow>
-            <span>
+            <span>u
               <IconButton
                 size="small"
                 onClick={() => handleToggleValide(params.row, !isValid)}
